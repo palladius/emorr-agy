@@ -16,6 +16,7 @@ E. Morricone Ag (emorr-agy) is a Go-based Telegram bot and CLI orchestrator to m
 ## Active Tracks
 - [000_initial_setup](tracks/000_initial_setup/index.md) (planned)
 - [agy_monitor_20260602](tracks/agy_monitor_20260602/index.md) (planned)
+- [telegram_channel_assets_20260602](tracks/telegram_channel_assets_20260602/index.md) (planned)
 
 ## References
 - [Product Guide](product.md)

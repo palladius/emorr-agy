@@ -48,14 +48,18 @@ func printUsage() {
 }
 
 func sendTelegramMessage(text string) error {
-	botToken := getEnvWithFallback("TELEGRAM_BOT_TOKEN", "TELEGRAM_APITOKEN")
+	botToken := getEnvWithFallback("TELEGRAM_BOT_ID", "TELEGRAM_BOT_TOKEN", "TELEGRAM_APITOKEN")
+	botToken = cleanValue(botToken)
+
 	chatID := getEnvWithFallback("TELEGRAM_CHAT_ID", "TELEGRAM_CHANNEL_ID")
+	chatID = cleanValue(chatID)
+	if chatID == "" {
+		// Fallback to Riccardo's default direct Chat ID
+		chatID = "605724096"
+	}
 
 	if botToken == "" {
-		return fmt.Errorf("TELEGRAM_BOT_TOKEN or TELEGRAM_APITOKEN is not set in .env")
-	}
-	if chatID == "" {
-		return fmt.Errorf("TELEGRAM_CHAT_ID or TELEGRAM_CHANNEL_ID is not set in .env")
+		return fmt.Errorf("TELEGRAM_BOT_ID, TELEGRAM_BOT_TOKEN or TELEGRAM_APITOKEN is not set in .env")
 	}
 
 	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
@@ -77,10 +81,34 @@ func sendTelegramMessage(text string) error {
 	return nil
 }
 
-func getEnvWithFallback(key, fallbackKey string) string {
-	val := os.Getenv(key)
-	if val == "" {
-		val = os.Getenv(fallbackKey)
+func getEnvWithFallback(keys ...string) string {
+	for _, key := range keys {
+		if val := os.Getenv(key); val != "" {
+			return val
+		}
 	}
-	return val
+	return ""
+}
+
+func cleanValue(s string) string {
+	s = strings.TrimSpace(s)
+	// Remove enclosing single quotes
+	if strings.HasPrefix(s, "'") && strings.HasSuffix(s, "'") {
+		if len(s) >= 2 {
+			s = s[1 : len(s)-1]
+		}
+	}
+	// Remove enclosing double quotes
+	if strings.HasPrefix(s, "\"") && strings.HasSuffix(s, "\"") {
+		if len(s) >= 2 {
+			s = s[1 : len(s)-1]
+		}
+	}
+	// Strip trailing 's
+	if strings.HasSuffix(s, "'s") {
+		s = strings.TrimSuffix(s, "'s")
+	}
+	// Strip extra enclosing quotes
+	s = strings.Trim(s, "\"'")
+	return s
 }

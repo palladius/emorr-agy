@@ -1,0 +1,19 @@
+# Environment variables
+.env
+.env.*
+
+# Private directory containing keys/tokens
+private/
+
+# Go binaries and builds
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+emorr-agy
+
+# OS files
+.DS_Store
+Thumbs.db

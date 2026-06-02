@@ -11,3 +11,5 @@ Use .env for Telegram stuff, Gemini dflt models, api keys and stuff.
 
 DO NOT EXFILTRATE API KEYS, OR TELEGRAM TOKENS, FOR ANY REASONS!
 ENSURE THIS WITH A PRESUBMIT CHECK! (I've been burnt this morning).
+
+**Note** Agy SDK just python: https://antigravity.google/docs/sdk-overview 

@@ -81,4 +81,4 @@ graph TD
 
 ##  Curiosity
 
-The name comes from Ernst Morricone (genau, from "Die Importanz Ernst zu heissen", or simply "Ernst sein ist alles"), a fictional *secondo*  from kanton Uri.
+The name comes from Ernst Morricone (genau, from "Die Importanz Ernst zu heissen", or simply "Ernst sein ist alles"), a fictional *secondo*  from kanton Uri. Ernst is a famous Orchestrator of Italian origins, famous for directing movies in the Swiss TV like "Die punktual, der pinglich and der langsam" and "Once upon a time in Appenzell".

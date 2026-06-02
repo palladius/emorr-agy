@@ -78,3 +78,7 @@ graph TD
 * **Telegram Integration**: `go-telegram-bot-api`
 * **Session Management**: Native `tmux` CLI integration with process status inference.
 * **State Persistence**: Simple JSON state tracking (e.g., `~/.emorragi_state.json`) for session restoration.
+
+##  Curiosity
+
+The name comes from Ernst Morricone (genau, from "Die Importanz Ernst zu heissen", or simply "Ernst sein ist alles"), a fictional *secondo*  from kanton Uri.

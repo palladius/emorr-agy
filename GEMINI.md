@@ -1,4 +1,6 @@
 
+DO NOT WRITE in .env! Only read it!
+
 This is an agy orchestrator for Telegram written in Go.
 See BDD in  /home/riccardo/obsidian/PBTPersonalSync/Progetti/E. Morricone Ag.md
 Use conductor to mplement this! Make sure this is persisted in github in palladius/emorr-agy

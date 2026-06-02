@@ -13,6 +13,7 @@ bin/
 *.so
 *.dylib
 emorr-agy
+emorragy
 
 # OS files
 .DS_Store

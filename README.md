@@ -5,7 +5,7 @@
 ---
 
 <p align="center">
-  <img src="doc/img/conductor_juggling.png" alt="E. Morricone Ag Conductor Juggling" width="600px" style="border-radius: 8px;" />
+  <img src="doc/img/conductor_swiss.png" alt="E. Morricone A.g. Conductor in Switzerland" width="600px" style="border-radius: 8px;" />
 </p>
 
 ---

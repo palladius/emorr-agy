@@ -1,17 +1,22 @@
+## DOs and DONTs
 
-DO NOT WRITE in .env! Only read it!
+* DO NOT WRITE in .env! Only read it! To suggest a change create a .env.proposed and ask USER to copy/merge.
+* Use .env for Telegram stuff, Gemini dflt models, api keys and stuff.
+* DO NOT EXFILTRATE API KEYS, OR TELEGRAM TOKENS, FOR ANY REASONS! ENSURE THIS WITH A PRESUBMIT CHECK! (I've been burnt this morning).
+
+
+## About
 
 This is an agy orchestrator for Telegram written in Go.
-See BDD in  /home/riccardo/obsidian/PBTPersonalSync/Progetti/E. Morricone Ag.md
-Use conductor to mplement this! Make sure this is persisted in github in palladius/emorr-agy
+Use `conductor` skillset to implement this package! Every feature should be a Concudtor NewTrack
 
-Open points:
-* Does Antigravity SDK support "open vs not open threads" and "active vs waiting for user input"?
-* If so lets start with a super quick prototype.
+# GH Issues
 
-Use .env for Telegram stuff, Gemini dflt models, api keys and stuff.
+Periodically (and at startup) check open GH Issue.
+* If not conductor track name or id is in it, use `/conductor:newTrack` to onboard it.
+* comment on the bug with this id, so we dont duplicate
+* Keep updated the bug with progress, and close when done.
 
-DO NOT EXFILTRATE API KEYS, OR TELEGRAM TOKENS, FOR ANY REASONS!
-ENSURE THIS WITH A PRESUBMIT CHECK! (I've been burnt this morning).
+## Bibliography
 
-**Note** Agy SDK just python: https://antigravity.google/docs/sdk-overview 
+**Note** Agy SDK just python: https://antigravity.google/docs/sdk-overview

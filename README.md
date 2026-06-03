@@ -15,7 +15,7 @@
 ```mermaid
 graph TD
     A[Riccardo] -- Telegram --> B{Telegram API};
-    
+
     subgraph Host 1
         B -- Command --> C1[emorr-agy service];
         C1 --> D1_1[tmux s1 - active];
@@ -61,6 +61,10 @@ graph TD
     style D3_4 fill:#f8f9fa,stroke:#dee2e6
     style D3_5 fill:#d4edda,stroke:#c3e6cb
 ```
+
+Or simply:
+
+![assets/emorragi_architecture.png]
 
 ## Features (BDD Specs)
 

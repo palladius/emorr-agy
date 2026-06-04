@@ -108,7 +108,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 func getEmojiForState(state SessionState) string {
 	switch state {
 	case StateOpenTmux:
-		return "🖥"
+		return "💻"
 	case StateOpenAgy:
 		return "🟢"
 	case StateOpenPrivate:

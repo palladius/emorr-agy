@@ -2,6 +2,8 @@
 
 > **E. Morricone Ag** (`emorr-agy`) is a Go-based Telegram bot and CLI orchestrator designed to manage, monitor, and interact with multiple `tmux` sessions running on remote machines.
 
+For detailed information on command-line options, daemon setup, and configurations, please refer to the [User Manual](doc/CLI.md).
+
 ---
 
 <p align="center">
@@ -64,7 +66,7 @@ graph TD
 
 Or simply:
 
-![assets/emorragi_architecture.png]
+![Project Architecture Diagram](doc/img/emorragi_architecture.png)
 
 ## Features (BDD Specs)
 

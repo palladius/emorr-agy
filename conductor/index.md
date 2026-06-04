@@ -3,6 +3,8 @@
 ## Product Vision
 E. Morricone Ag (emorr-agy) is a Go-based Telegram bot and CLI orchestrator to manage, monitor, and interact with remote tmux sessions.
 
+Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/emorr-agy/doc/img/emorragi_architecture.png) for a visual overview of the end-to-end command flow.
+
 ## Project Goals
 - Convenient process command and control via Telegram.
 - Clean process state transparency and activity tracking.

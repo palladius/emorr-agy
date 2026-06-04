@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/palladius/emorr-agy/internal/color"
 )
 
 type ListOptions struct {
@@ -40,23 +43,61 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 	case "long":
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(tw, "STATUS\tSESSION ID\tAGE\tDIRECTORY\tHARNESS\tWINDOWS\tRESUME COMMAND")
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			color.Colorize("STATUS", color.Plain),
+			color.Colorize("SESSION ID", color.Plain),
+			color.Colorize("AGE", color.Plain),
+			color.Colorize("DIRECTORY", color.Plain),
+			color.Colorize("HARNESS", color.Plain),
+			color.Colorize("WINDOWS", color.Plain),
+			color.Colorize("RESUME COMMAND", color.Plain),
+		)
 		for _, s := range sessions {
 			emoji := getEmojiForState(s.State)
 			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%d\t%s\n", emoji, s.ID, age, folder, s.Harness, s.ProcessCount, s.ResumeCommand)
+
+			ageColor := color.LightGray
+			if strings.Contains(age, "d") || age == "n/a" {
+				ageColor = color.DarkGray
+			}
+
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+				color.Colorize(emoji, color.Plain),
+				color.Colorize(s.ID, color.BoldWhite),
+				color.Colorize(age, ageColor),
+				color.Colorize(folder, color.Blue),
+				color.Colorize(s.Harness, color.Plain),
+				color.Colorize(strconv.Itoa(s.ProcessCount), color.Plain),
+				color.Colorize(s.ResumeCommand, color.Plain),
+			)
 		}
 		tw.Flush()
 
 	default: // "short" or fallback
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(tw, "STATUS\tSESSION ID\tAGE\tDIRECTORY")
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
+			color.Colorize("STATUS", color.Plain),
+			color.Colorize("SESSION ID", color.Plain),
+			color.Colorize("AGE", color.Plain),
+			color.Colorize("DIRECTORY", color.Plain),
+		)
 		for _, s := range sessions {
 			emoji := getEmojiForState(s.State)
 			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", emoji, s.ID, age, folder)
+
+			ageColor := color.LightGray
+			if strings.Contains(age, "d") || age == "n/a" {
+				ageColor = color.DarkGray
+			}
+
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
+				color.Colorize(emoji, color.Plain),
+				color.Colorize(s.ID, color.BoldWhite),
+				color.Colorize(age, ageColor),
+				color.Colorize(folder, color.Blue),
+			)
 		}
 		tw.Flush()
 	}

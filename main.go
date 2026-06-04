@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/palladius/emorr-agy/internal/color"
 	"github.com/palladius/emorr-agy/internal/gemini"
 	"github.com/palladius/emorr-agy/internal/sessions"
 	"github.com/palladius/emorr-agy/internal/telegram"
@@ -315,7 +316,13 @@ func runMonitor() error {
 	fmt.Println("--------------------------------------------------------------------------------")
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "STATUS\tSESSION ID\tAGE\tSTATE\tDIRECTORY")
+	fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+		color.Colorize("STATUS", color.Plain),
+		color.Colorize("SESSION ID", color.Plain),
+		color.Colorize("AGE", color.Plain),
+		color.Colorize("STATE", color.Plain),
+		color.Colorize("DIRECTORY", color.Plain),
+	)
 
 	for _, thread := range threads {
 		shortID := thread.ConvID
@@ -326,8 +333,19 @@ func runMonitor() error {
 		folder := strings.ReplaceAll(thread.Dir, "/usr/local/google/home/ricc", "~")
 		age := sessions.FormatAge(thread.LastActivity)
 
+		ageColor := color.LightGray
+		if strings.Contains(age, "d") || age == "n/a" {
+			ageColor = color.DarkGray
+		}
+
 		if !thread.IsOpen {
-			fmt.Fprintf(tw, "⚫\t%s\t%s\tCLOSED\t%s\n", shortID, age, folder)
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+				color.Colorize("⚫", color.Plain),
+				color.Colorize(shortID, color.BoldWhite),
+				color.Colorize(age, ageColor),
+				color.Colorize("CLOSED", color.Plain),
+				color.Colorize(folder, color.Blue),
+			)
 			continue
 		}
 
@@ -350,7 +368,13 @@ func runMonitor() error {
 			}
 		}
 
-		fmt.Fprintf(tw, "🟢\t%s\t%s\t%s\t%s\n", shortID, age, stateDetail, folder)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+			color.Colorize("🟢", color.Plain),
+			color.Colorize(shortID, color.BoldWhite),
+			color.Colorize(age, ageColor),
+			color.Colorize(stateDetail, color.Plain),
+			color.Colorize(folder, color.Blue),
+		)
 	}
 	tw.Flush()
 

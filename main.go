@@ -5,8 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,7 +14,9 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/palladius/emorr-agy/internal/gemini"
 	"github.com/palladius/emorr-agy/internal/sessions"
+	"github.com/palladius/emorr-agy/internal/telegram"
 )
 
 const Version = "0.1.1"
@@ -39,7 +39,7 @@ func main() {
 			os.Exit(1)
 		}
 		message := strings.Join(os.Args[3:], " ")
-		err := sendTelegramMessage(message)
+		err := telegram.SendTelegramMessage(message)
 		if err != nil {
 			log.Fatalf("Error sending message: %v", err)
 		}
@@ -176,39 +176,7 @@ func printUsage() {
 	printFooter()
 }
 
-func sendTelegramMessage(text string) error {
-	botToken := getEnvWithFallback("TELEGRAM_BOT_ID", "TELEGRAM_BOT_TOKEN", "TELEGRAM_APITOKEN")
-	botToken = cleanValue(botToken)
 
-	chatID := getEnvWithFallback("TELEGRAM_CHAT_ID", "TELEGRAM_CHANNEL_ID")
-	chatID = cleanValue(chatID)
-	if chatID == "" {
-		// Fallback to Riccardo's default direct Chat ID
-		chatID = "605724096"
-	}
-
-	if botToken == "" {
-		return fmt.Errorf("TELEGRAM_BOT_ID, TELEGRAM_BOT_TOKEN or TELEGRAM_APITOKEN is not set in .env")
-	}
-
-	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
-	
-	resp, err := http.PostForm(apiURL, url.Values{
-		"chat_id":    {chatID},
-		"text":       {text},
-		"parse_mode": {"Markdown"},
-	})
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("received non-OK status: %s", resp.Status)
-	}
-
-	return nil
-}
 
 func getEnvWithFallback(keys ...string) string {
 	for _, key := range keys {
@@ -474,7 +442,7 @@ func sendStartupNotification() {
 		hostname = "unknown"
 	}
 	msg := fmt.Sprintf("Emorr-Agy v%s started on %s", Version, hostname)
-	err = sendTelegramMessage(msg)
+	err = telegram.SendTelegramMessage(msg)
 	if err != nil {
 		log.Printf("Failed to send startup notification: %v", err)
 	}
@@ -586,25 +554,8 @@ func printFooter() {
 
 // --- Server Subcommand Logic ---
 
-type TelegramUpdateResponse struct {
-	Ok     bool             `json:"ok"`
-	Result []TelegramUpdate `json:"result"`
-}
-
-type TelegramUpdate struct {
-	UpdateID int             `json:"update_id"`
-	Message  *TelegramMessage `json:"message"`
-}
-
-type TelegramMessage struct {
-	MessageID int           `json:"message_id"`
-	Chat      TelegramChat  `json:"chat"`
-	Text      string        `json:"text"`
-}
-
-type TelegramChat struct {
-	ID int64 `json:"id"`
-}
+var getStatusOutputFunc = getStatusOutput
+var getMonitorOutputFunc = getMonitorOutput
 
 func runServer() error {
 	homeDir, err := os.UserHomeDir()
@@ -641,7 +592,7 @@ func runServer() error {
 
 	offset := 0
 	for {
-		updates, err := getTelegramUpdates(botToken, offset)
+		updates, err := telegram.GetTelegramUpdates(botToken, offset)
 		if err != nil {
 			log.Printf("Error getting updates: %v", err)
 			time.Sleep(5 * time.Second)
@@ -653,82 +604,123 @@ func runServer() error {
 				offset = update.UpdateID + 1
 			}
 
-			if update.Message == nil {
-				continue
-			}
-
-			text := strings.TrimSpace(update.Message.Text)
-			chatID := update.Message.Chat.ID
-
-			log.Printf("Received message from chat %d: %q", chatID, text)
-
-			switch {
-			case strings.HasPrefix(text, "/status") || text == "status":
-				statusOutput, err := getStatusOutput()
-				if err != nil {
-					sendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error getting status: %v", err))
-				} else {
-					sendTelegramMessageToChat(botToken, chatID, statusOutput)
-				}
-
-			case strings.HasPrefix(text, "/monitor") || text == "monitor":
-				monitorOutput, err := getMonitorOutput()
-				if err != nil {
-					sendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error getting monitor: %v", err))
-				} else {
-					sendTelegramMessageToChat(botToken, chatID, monitorOutput)
-				}
-
-			case strings.HasPrefix(text, "/help") || strings.HasPrefix(text, "/start") || text == "help":
-				helpMsg := "📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads"
-				sendTelegramMessageToChat(botToken, chatID, helpMsg)
-			}
+			_ = processUpdate(botToken, update)
 		}
 
 		time.Sleep(1 * time.Second)
 	}
 }
 
-func getTelegramUpdates(botToken string, offset int) ([]TelegramUpdate, error) {
-	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/getUpdates?offset=%d&timeout=10", botToken, offset)
-	
-	resp, err := http.Get(apiURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("non-OK status: %s", resp.Status)
+func processUpdate(botToken string, update telegram.TelegramUpdate) error {
+	if update.Message == nil {
+		return nil
 	}
 
-	var updateResp TelegramUpdateResponse
-	err = json.NewDecoder(resp.Body).Decode(&updateResp)
-	if err != nil {
-		return nil, err
+	var text string
+	chatID := update.Message.Chat.ID
+
+	if update.Message.Voice != nil {
+		log.Printf("Received voice message from chat %d", chatID)
+		transcribedText, err := downloadAndTranscribe(botToken, update.Message.Voice.FileID, "audio/ogg", chatID)
+		if err != nil {
+			log.Printf("Failed to process voice message: %v", err)
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("⚠️ Error processing voice message: %v", err))
+			return err
+		}
+		text = transcribedText
+	} else if update.Message.Audio != nil {
+		log.Printf("Received audio message from chat %d", chatID)
+		mimeType := update.Message.Audio.MimeType
+		if mimeType == "" {
+			mimeType = "audio/mpeg"
+		}
+		transcribedText, err := downloadAndTranscribe(botToken, update.Message.Audio.FileID, mimeType, chatID)
+		if err != nil {
+			log.Printf("Failed to process audio message: %v", err)
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("⚠️ Error processing audio message: %v", err))
+			return err
+		}
+		text = transcribedText
+	} else {
+		text = strings.TrimSpace(update.Message.Text)
 	}
 
-	return updateResp.Result, nil
-}
-
-func sendTelegramMessageToChat(botToken string, chatID int64, text string) error {
-	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
-	
-	resp, err := http.PostForm(apiURL, url.Values{
-		"chat_id":    {strconv.FormatInt(chatID, 10)},
-		"text":       {text},
-		"parse_mode": {"Markdown"},
-	})
-	if err != nil {
-		return err
+	if text == "" {
+		return nil
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("received non-OK status: %s", resp.Status)
+	log.Printf("Routing command message from chat %d: %q", chatID, text)
+
+	switch {
+	case strings.HasPrefix(text, "/status") || text == "status":
+		statusOutput, err := getStatusOutputFunc()
+		if err != nil {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error getting status: %v", err))
+		} else {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, statusOutput)
+		}
+
+	case strings.HasPrefix(text, "/monitor") || text == "monitor":
+		monitorOutput, err := getMonitorOutputFunc()
+		if err != nil {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error getting monitor: %v", err))
+		} else {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, monitorOutput)
+		}
+
+	case strings.HasPrefix(text, "/help") || strings.HasPrefix(text, "/start") || text == "help":
+		helpMsg := "📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads"
+		_ = telegram.SendTelegramMessageToChat(botToken, chatID, helpMsg)
 	}
 
 	return nil
+}
+
+func downloadAndTranscribe(botToken, fileID, mimeType string, chatID int64) (string, error) {
+	filePath, err := telegram.GetFilePath(botToken, fileID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get file path: %w", err)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user home: %w", err)
+	}
+
+	ext := filepath.Ext(filePath)
+	if ext == "" {
+		if mimeType == "audio/ogg" {
+			ext = ".ogg"
+		} else {
+			ext = ".mp3"
+		}
+	}
+
+	localFileName := fmt.Sprintf("voice_%d_%s%s", time.Now().UnixNano(), fileID, ext)
+	localPath := filepath.Join(homeDir, ".gemini/antigravity-cli/tmp", localFileName)
+
+	err = telegram.DownloadFile(botToken, filePath, localPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to download file: %w", err)
+	}
+	defer os.Remove(localPath)
+
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		return "", fmt.Errorf("GEMINI_API_KEY environment variable is empty")
+	}
+
+	transcriber := gemini.NewGeminiTranscriber(apiKey)
+	res, err := transcriber.Transcribe(localPath, mimeType)
+	if err != nil {
+		return "", fmt.Errorf("transcription failed: %w", err)
+	}
+
+	flag := gemini.MapLanguageToFlag(res.Language)
+	replyMsg := fmt.Sprintf("%s _%s_", flag, res.Text)
+	_ = telegram.SendTelegramMessageToChat(botToken, chatID, replyMsg)
+
+	return res.Text, nil
 }
 
 func getStatusOutput() (string, error) {

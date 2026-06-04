@@ -38,7 +38,7 @@ func TestListSessionsFormats(t *testing.T) {
 		if !strings.Contains(output, "STATUS") || !strings.Contains(output, "SESSION ID") || !strings.Contains(output, "DIRECTORY") {
 			t.Errorf("missing headers in short format output: %q", output)
 		}
-		if !strings.Contains(output, "🟢") || !strings.Contains(output, "emagy-session-1") || !strings.Contains(output, "/workspace/proj1") {
+		if !strings.Contains(output, "🖥️") || !strings.Contains(output, "emagy-session-1") || !strings.Contains(output, "/workspace/proj1") {
 			t.Errorf("missing open tmux session details in short format: %q", output)
 		}
 		if !strings.Contains(output, "🔒") || !strings.Contains(output, "my-private-session") {

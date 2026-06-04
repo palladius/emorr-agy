@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ type SessionState string
 const (
 	StateOpenTmux           SessionState = "open_tmux"
 	StateOpenPrivate        SessionState = "open_private"
+	StateOpenAgy            SessionState = "open_agy"
 	StateDeadResuscitatable SessionState = "dead_resuscitatable"
 	StateDeadArchived       SessionState = "dead_archived"
 )
@@ -113,6 +115,9 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 	var sessions []Session
 	runningMap := make(map[string]bool)
 
+	// A. Find all active conversations based on open DB locks
+	activeConvs := c.findActiveConvs()
+
 	// 1. Get running tmux sessions
 	tmuxSessions, err := c.tmux.ListSessions()
 	if err == nil {
@@ -126,12 +131,6 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 			// Extract session ID from tmux name if it has prefix
 			id := ts.Name
 			if idx := strings.Index(ts.Name, "-"); idx != -1 && harness != "unknown" {
-				// E.g., emagy-session-12345 -> session-12345 (or just take the rest)
-				// Wait, let's keep the ID as the suffix or the full name? Let's check the test expectation:
-				// The test expected: `s.ID == "session-12345" || s.ID == "emagy-session-12345"`
-				// Let's extract ID from the prefix suffix, but if it has a prefix, let's match both.
-				// Actually, we can keep the full tmux name, but if we map from historical map we should correlate.
-				// Let's extract the conversation ID suffix if it starts with one of our prefixes.
 				if strings.HasPrefix(ts.Name, "emagy-") {
 					id = strings.TrimPrefix(ts.Name, "emagy-")
 				} else if strings.HasPrefix(ts.Name, "emgem-") {
@@ -144,35 +143,83 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 			runningMap[id] = true
 			runningMap[ts.Name] = true
 
+			// Determine last activity time from SQLite DB
+			var lastActivity time.Time
+			dbPath := filepath.Join(c.homeDir, ".gemini/antigravity-cli/conversations", id+".db")
+			if fi, err := c.fs.Stat(dbPath); err == nil {
+				lastActivity = fi.ModTime()
+			} else {
+				if fi, err := c.fs.Stat(ts.Path); err == nil {
+					lastActivity = fi.ModTime()
+				}
+			}
+
 			s := Session{
-				ID:            ts.Name, // Keep name as ID or extracted ID? Let's keep ts.Name as ID but populate other fields
+				ID:            ts.Name,
 				Harness:       harness,
 				State:         state,
 				Folder:        ts.Path,
-				ProcessCount:  ts.Windows, // fallback/rough count
+				ProcessCount:  ts.Windows,
+				LastActivity:  lastActivity,
 				ResumeCommand: "tmux attach -t " + ts.Name,
 			}
 			sessions = append(sessions, s)
 		}
 	}
 
-	// 2. Load historical sessions from cache file
+	// 2. Load historical and active non-tmux sessions from cache file
 	cacheFile := filepath.Join(c.homeDir, ".gemini/antigravity-cli/cache/last_conversations.json")
 	if data, err := c.fs.ReadFile(cacheFile); err == nil {
 		var cacheConvs map[string]string
 		if err := json.Unmarshal(data, &cacheConvs); err == nil {
 			for folder, convID := range cacheConvs {
-				// If it's already running in tmux, skip adding a duplicate dead session
+				// If it's already running in tmux, skip adding a duplicate session
 				if runningMap[convID] {
 					continue
 				}
 
 				harness := "agy" // fallback for historical
-				state := StateDeadResuscitatable
+				var state SessionState
 
-				// Check exclusions
-				if c.isExcluded(convID, folder) {
-					state = StateDeadArchived
+				// If it's active in background processes but not in tmux, it's StateOpenAgy (emoji 🟢)
+				if _, active := activeConvs[convID]; active {
+					state = StateOpenAgy
+					runningMap[convID] = true
+				} else {
+					// It's dead. Check LLM cache for worth_resuscitate first.
+					worthResuscitate := true
+					cachePath := filepath.Join(c.homeDir, ".emorr-agy/cache", convID+".json")
+					var cachedAbout string
+					if data, err := c.fs.ReadFile(cachePath); err == nil {
+						var cacheRes struct {
+							About            string `json:"about"`
+							UserInputPending bool   `json:"user_input_pending"`
+							WorthResuscitate bool   `json:"worth_resuscitate"`
+						}
+						if err := json.Unmarshal(data, &cacheRes); err == nil {
+							worthResuscitate = cacheRes.WorthResuscitate
+							cachedAbout = cacheRes.About
+						}
+					}
+
+					if !worthResuscitate || c.isExcluded(convID, folder) {
+						state = StateDeadArchived
+					} else {
+						state = StateDeadResuscitatable
+					}
+
+					_ = cachedAbout // Can be used in description if we want
+				}
+
+				// Determine last activity time from SQLite DB
+				var lastActivity time.Time
+				dbPath := filepath.Join(c.homeDir, ".gemini/antigravity-cli/conversations", convID+".db")
+				if fi, err := c.fs.Stat(dbPath); err == nil {
+					lastActivity = fi.ModTime()
+				} else {
+					if fi, err := c.fs.Stat(folder); err == nil {
+						lastActivity = fi.ModTime()
+					}
 				}
 
 				s := Session{
@@ -180,14 +227,23 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 					Harness:       harness,
 					State:         state,
 					Folder:        folder,
-					ResumeCommand: "emorr-agy resume " + convID, // fallback resume CLI
+					LastActivity:  lastActivity,
+					ResumeCommand: "emorr-agy resume " + convID,
 				}
 				sessions = append(sessions, s)
 			}
 		}
 	}
 
-	// 3. Filter by harness if filter is provided
+	// 3. Sort sessions by last activity (mod time) descending, latest first
+	sort.Slice(sessions, func(i, j int) bool {
+		if sessions[i].LastActivity.Equal(sessions[j].LastActivity) {
+			return sessions[i].ID < sessions[j].ID
+		}
+		return sessions[i].LastActivity.After(sessions[j].LastActivity)
+	})
+
+	// 4. Filter by harness if filter is provided
 	if len(harnessFilter) > 0 {
 		var filtered []Session
 		for _, s := range sessions {
@@ -202,6 +258,46 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 	}
 
 	return sessions, nil
+}
+
+func (c *ClassificationEngine) findActiveConvs() map[string]int {
+	active := make(map[string]int)
+	files, err := c.fs.ReadDir("/proc")
+	if err != nil {
+		return active
+	}
+
+	for _, file := range files {
+		if !file.IsDir() {
+			continue
+		}
+		pidStr := file.Name()
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			continue
+		}
+
+		fdDir := filepath.Join("/proc", pidStr, "fd")
+		fds, err := c.fs.ReadDir(fdDir)
+		if err != nil {
+			continue
+		}
+
+		for _, fd := range fds {
+			fdPath := filepath.Join(fdDir, fd.Name())
+			target, err := c.fs.Readlink(fdPath)
+			if err != nil {
+				continue
+			}
+
+			if strings.Contains(target, "/.gemini/antigravity-cli/conversations/") && strings.HasSuffix(target, ".db") {
+				filename := filepath.Base(target)
+				convID := strings.TrimSuffix(filename, ".db")
+				active[convID] = pid
+			}
+		}
+	}
+	return active
 }
 
 func getHarnessFromPrefix(name string) string {

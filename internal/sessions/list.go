@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"text/tabwriter"
+	"time"
 )
 
 type ListOptions struct {
@@ -39,21 +40,23 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 	case "long":
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(tw, "STATUS\tSESSION ID\tDIRECTORY\tHARNESS\tWINDOWS\tRESUME COMMAND")
+		fmt.Fprintln(tw, "STATUS\tSESSION ID\tAGE\tDIRECTORY\tHARNESS\tWINDOWS\tRESUME COMMAND")
 		for _, s := range sessions {
 			emoji := getEmojiForState(s.State)
+			age := formatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\n", emoji, s.ID, folder, s.Harness, s.ProcessCount, s.ResumeCommand)
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%d\t%s\n", emoji, s.ID, age, folder, s.Harness, s.ProcessCount, s.ResumeCommand)
 		}
 		tw.Flush()
 
 	default: // "short" or fallback
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(tw, "STATUS\tSESSION ID\tDIRECTORY")
+		fmt.Fprintln(tw, "STATUS\tSESSION ID\tAGE\tDIRECTORY")
 		for _, s := range sessions {
 			emoji := getEmojiForState(s.State)
+			age := formatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
-			fmt.Fprintf(tw, "%s\t%s\t%s\n", emoji, s.ID, folder)
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", emoji, s.ID, age, folder)
 		}
 		tw.Flush()
 	}
@@ -64,6 +67,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 func getEmojiForState(state SessionState) string {
 	switch state {
 	case StateOpenTmux:
+		return "🖥️"
+	case StateOpenAgy:
 		return "🟢"
 	case StateOpenPrivate:
 		return "🔒"
@@ -74,4 +79,22 @@ func getEmojiForState(state SessionState) string {
 	default:
 		return "❓"
 	}
+}
+
+func formatAge(t time.Time) string {
+	if t.IsZero() {
+		return "n/a"
+	}
+	d := time.Since(t)
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	if d < 24*time.Hour {
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	}
+	days := int(d.Hours() / 24)
+	return fmt.Sprintf("%dd", days)
 }

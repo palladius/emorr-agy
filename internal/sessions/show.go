@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -64,7 +65,8 @@ func ShowSession(w io.Writer, engine *ClassificationEngine, sessionID string, op
 	fmt.Fprintf(w, "SESSION ID:     %s\n", target.ID)
 	fmt.Fprintf(w, "HARNESS:        %s\n", target.Harness)
 	fmt.Fprintf(w, "STATE:          %s\n", target.State)
-	fmt.Fprintf(w, "DIRECTORY:      %s\n", target.Folder)
+	folder := strings.ReplaceAll(target.Folder, "/usr/local/google/home/ricc", "~")
+	fmt.Fprintf(w, "DIRECTORY:      %s\n", folder)
 	fmt.Fprintf(w, "PROCESS/WINDOW: %d\n", target.ProcessCount)
 	fmt.Fprintf(w, "RESUME CMD:     %s\n", target.ResumeCommand)
 

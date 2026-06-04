@@ -12,3 +12,7 @@ telegram-test:
 clean:
 	rm -rf bin/ *.out
 
+test:
+	GOROOT=/usr/lib/go go test -v ./...
+
+

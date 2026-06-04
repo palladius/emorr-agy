@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/palladius/emorr-agy/internal/sessions"
 )
 
 const Version = "0.1.1"
@@ -67,6 +69,95 @@ func main() {
 			log.Fatalf("Error running check: %v", err)
 		}
 
+	case "sessions":
+		if len(os.Args) < 3 {
+			printUsage()
+			os.Exit(1)
+		}
+		subcommand := os.Args[2]
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting user home dir: %v", err)
+		}
+
+		switch subcommand {
+		case "list":
+			fs := flag.NewFlagSet("sessions list", flag.ExitOnError)
+			var harnessFlag string
+			var jsonFlag, longFlag, shortFlag bool
+
+			fs.StringVar(&harnessFlag, "harness", "", "Filter by harness type (comma-separated list, e.g. agy,gemini)")
+			fs.BoolVar(&jsonFlag, "json", false, "JSON output format")
+			fs.BoolVar(&longFlag, "long", false, "Long tabular output format")
+			fs.BoolVar(&shortFlag, "short", false, "Short tabular output format (default)")
+
+			_ = fs.Parse(os.Args[3:])
+
+			format := "short"
+			if jsonFlag {
+				format = "json"
+			} else if longFlag {
+				format = "long"
+			} else if shortFlag {
+				format = "short"
+			}
+
+			var harnesses []string
+			if harnessFlag != "" {
+				parts := strings.Split(harnessFlag, ",")
+				for _, p := range parts {
+					harnesses = append(harnesses, strings.TrimSpace(p))
+				}
+			}
+
+			engine := sessions.NewClassificationEngine(sessions.RealTmuxRunner{}, sessions.OSFileSystem{}, homeDir)
+			opts := sessions.ListOptions{
+				Harness: harnesses,
+				Format:  format,
+			}
+			if err := sessions.ListSessions(os.Stdout, engine, opts); err != nil {
+				log.Fatalf("Error listing sessions: %v", err)
+			}
+
+		case "show":
+			fs := flag.NewFlagSet("sessions show", flag.ExitOnError)
+			var classifyFlag, llmFlag bool
+			fs.BoolVar(&classifyFlag, "classify", false, "Enable LLM classification for session")
+			fs.BoolVar(&llmFlag, "llm", false, "Enable LLM classification for session")
+
+			_ = fs.Parse(os.Args[3:])
+
+			positionalArgs := fs.Args()
+			if len(positionalArgs) < 1 {
+				fmt.Println("Error: missing session ID")
+				printUsage()
+				os.Exit(1)
+			}
+			sessionID := positionalArgs[0]
+
+			engine := sessions.NewClassificationEngine(sessions.RealTmuxRunner{}, sessions.OSFileSystem{}, homeDir)
+			opts := sessions.ShowOptions{
+				Classify: classifyFlag || llmFlag,
+			}
+
+			apiKey := os.Getenv("GEMINI_API_KEY")
+			var classifier sessions.LLMClassifier
+			if opts.Classify {
+				if apiKey == "" {
+					log.Fatalf("Error: GEMINI_API_KEY environment variable is required when --classify or --llm is set")
+				}
+				classifier = sessions.NewGeminiClassifier(apiKey, homeDir)
+			}
+
+			if err := sessions.ShowSession(os.Stdout, engine, sessionID, opts, classifier); err != nil {
+				log.Fatalf("Error showing session %q: %v", sessionID, err)
+			}
+
+		default:
+			printUsage()
+			os.Exit(1)
+		}
+
 	default:
 		printUsage()
 		os.Exit(1)
@@ -80,6 +171,9 @@ func printUsage() {
 	fmt.Println("  emorr-agy status                    - Show status of system, tmux, and threads")
 	fmt.Println("  emorr-agy server                    - Run the Telegram bot daemon receiver")
 	fmt.Println("  emorr-agy check                     - Verify tmux installation and mouse settings")
+	fmt.Println("  emorr-agy sessions list [options]   - List active and history sessions")
+	fmt.Println("  emorr-agy sessions show <id> [opts] - Show session details and LLM status")
+	printFooter()
 }
 
 func sendTelegramMessage(text string) error {
@@ -235,8 +329,10 @@ func runMonitor() error {
 			shortID = shortID[:8]
 		}
 
+		folder := strings.ReplaceAll(thread.Dir, "/usr/local/google/home/ricc", "~")
+
 		if !thread.IsOpen {
-			fmt.Printf("⚫ %s - %s [Closed]\n", shortID, thread.Dir)
+			fmt.Printf("⚫ %s - %s [Closed]\n", shortID, folder)
 			continue
 		}
 
@@ -263,7 +359,7 @@ func runMonitor() error {
 			}
 		}
 
-		fmt.Printf("🟢 %s - %s [%s %s]\n", shortID, thread.Dir, stateDetail, stateEmoji)
+		fmt.Printf("🟢 %s - %s [%s %s]\n", shortID, folder, stateDetail, stateEmoji)
 	}
 
 	return nil
@@ -433,6 +529,7 @@ func runStatus() error {
 		lines := strings.Split(strings.TrimSpace(string(tmuxOutput)), "\n")
 		for _, line := range lines {
 			if line != "" {
+				line = strings.ReplaceAll(line, "/usr/local/google/home/ricc", "~")
 				fmt.Printf("  • %s\n", line)
 			}
 		}
@@ -468,7 +565,23 @@ func runStatus() error {
 		fmt.Println("  Failed to query active threads (home dir unavailable).")
 	}
 
+	printFooter()
 	return nil
+}
+
+func printFooter() {
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown"
+	}
+	railsEnv := os.Getenv("RAILS_ENV")
+	if railsEnv == "" {
+		railsEnv = "development"
+	}
+	fmt.Println()
+	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Printf("🛡️  Emorr-Agy | GH: https://github.com/palladius/emorr-agy | Version: **%s**\n", Version)
+	fmt.Printf("👋 Created with ☕ for Riccardo | Host: %s | Env: %s\n", hostname, railsEnv)
 }
 
 // --- Server Subcommand Logic ---

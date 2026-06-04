@@ -3,7 +3,9 @@ package sessions
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -61,6 +63,36 @@ func (OSFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) er
 }
 func (OSFileSystem) MkdirAll(path string, perm os.FileMode) error { return os.MkdirAll(path, perm) }
 func (OSFileSystem) Remove(name string) error                     { return os.Remove(name) }
+
+type RealTmuxRunner struct{}
+
+func (RealTmuxRunner) ListSessions() ([]TmuxSession, error) {
+	cmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}\t#{session_path}\t#{session_attached}\t#{session_windows}")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var list []TmuxSession
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, "\t")
+		if len(parts) >= 4 {
+			attached := parts[2] == "1"
+			windows, _ := strconv.Atoi(parts[3])
+			list = append(list, TmuxSession{
+				Name:     parts[0],
+				Path:     parts[1],
+				Attached: attached,
+				Windows:  windows,
+			})
+		}
+	}
+	return list, nil
+}
 
 type ClassificationEngine struct {
 	tmux    TmuxRunner

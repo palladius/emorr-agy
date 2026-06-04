@@ -10,12 +10,22 @@
 This is an agy orchestrator for Telegram written in Go.
 Use `conductor` skillset to implement this package! Every feature should be a Concudtor NewTrack
 
-# GH Issues
+## Code
 
-Periodically (and at startup) check open GH Issue.
-* If not conductor track name or id is in it, use `/conductor:newTrack` to onboard it.
-* comment on the bug with this id, so we dont duplicate
-* Keep updated the bug with progress, and close when done.
+* Code should be modular (more small files with folders which make sense!)
+* Should be unit tested.
+* CLI should be battle tested (--help should work well, and --options should try to work as possible with most verbs)
+* add a `VERSION` file (or some go idiomatic way to track verison) and a `CHANGELOG.md` to keep track of changes by version.
+
+## GitHub Issues
+
+Periodically (and at startup) check open GH Issues.
+
+* If no conductor track name/id is mentioned in it, use `/conductor:newTrack` to onboard it.
+* Add a comment on the Issue (via `gh`) with the conductor id, so we don't duplicate work!
+* Label it "Conductor": so it appears here: https://github.com/palladius/emorr-agy/issues?q=state%3Aopen%20label%3A%22Conductor%22
+* Keep updated the Issue with progress, and close when done.
+* Sign your GHI messages with `-- Written by <HARNESS_NAME> on behalf of <PERSON_NAME>`
 
 ## Bibliography
 

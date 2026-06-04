@@ -31,14 +31,14 @@ Displays a comprehensive diagnostic report of the server environment, server sta
   📡 Emorr-Agy Status:
   --------------------------------------------------------------------------------
   Version:      v0.1.1
-  Hostname:     derek.zrh.corp.google.com
+  Hostname:     derek
   Telegram:     ✅ Configured
   Server:       ❌ Not Running
-  
+
   Active tmux Sessions:
   --------------------
     No active tmux sessions found (or tmux server not running).
-  
+
   Antigravity Threads:
   -------------------
     🟢 3 Active Threads (monitoring)

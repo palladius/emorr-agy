@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"text/tabwriter"
 )
 
@@ -41,7 +42,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		fmt.Fprintln(tw, "STATUS\tSESSION ID\tDIRECTORY\tHARNESS\tWINDOWS\tRESUME COMMAND")
 		for _, s := range sessions {
 			emoji := getEmojiForState(s.State)
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\n", emoji, s.ID, s.Folder, s.Harness, s.ProcessCount, s.ResumeCommand)
+			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\n", emoji, s.ID, folder, s.Harness, s.ProcessCount, s.ResumeCommand)
 		}
 		tw.Flush()
 
@@ -50,7 +52,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		fmt.Fprintln(tw, "STATUS\tSESSION ID\tDIRECTORY")
 		for _, s := range sessions {
 			emoji := getEmojiForState(s.State)
-			fmt.Fprintf(tw, "%s\t%s\t%s\n", emoji, s.ID, s.Folder)
+			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
+			fmt.Fprintf(tw, "%s\t%s\t%s\n", emoji, s.ID, folder)
 		}
 		tw.Flush()
 	}

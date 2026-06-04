@@ -15,4 +15,10 @@ clean:
 test:
 	GOROOT=/usr/lib/go go test -v ./...
 
+run-server-under-tmux: build
+	tmux new-session -d -s emorr-agy-server "./bin/emorr-agy server" || echo "Session 'emorr-agy-server' already exists. Use 'just attach-server' to view."
+
+attach-server:
+	tmux attach -t emorr-agy-server
+
 

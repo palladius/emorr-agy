@@ -21,4 +21,5 @@ run-server-under-tmux: build
 attach-server:
 	tmux attach -t emorr-agy-server
 
-
+version:
+	@cat VERSION

@@ -11,13 +11,13 @@
 - [x] Task 2.2: Implement `sessions list` command integration in `internal/sessions/list.go` with tabular output styling, emojis, and JSON format option. (b650673)
 - [x] Task 2.3: Conductor - User Manual Verification 'Phase 2: Sessions List Subcommand' (Protocol in workflow.md) (3df234e)
 
-## Phase 3: Sessions Show & LLM Classification
+## Phase 3: Sessions Show & LLM Classification [checkpoint: f1725eb]
 - [x] Task 3.1: Write unit tests verifying `sessions show` command, file locking (PID locking), and LLM classification caching. (f972643)
 - [x] Task 3.2: Implement `sessions show` command detail display, including resuscitation/resume commands. (c25ccc5)
 - [x] Task 3.3: Implement the `--classify` / `--llm` flag logic with caching (JSON cache file) and locking (PID lockfile under `~/.emorr-agy/locks/`). (c25ccc5)
-- [~] Task 3.4: Conductor - User Manual Verification 'Phase 3: Sessions Show & LLM Classification' (Protocol in workflow.md)
+- [x] Task 3.4: Conductor - User Manual Verification 'Phase 3: Sessions Show & LLM Classification' (Protocol in workflow.md) (f1725eb)
 
 ## Phase 4: CLI Integration & Validation
-- [ ] Task 4.1: Integrate `sessions` subcommand into root `main.go` using a clean CLI structure.
+- [~] Task 4.1: Integrate `sessions` subcommand into root `main.go` using a clean CLI structure.
 - [ ] Task 4.2: Verify compile parity (`just build`), run all unit tests, ensure >80% code coverage.
 - [ ] Task 4.3: Conductor - User Manual Verification 'Phase 4: CLI Integration & Validation' (Protocol in workflow.md)

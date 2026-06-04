@@ -9,7 +9,8 @@ This specification details the structural refactoring of the `emorr-agy` codebas
   - Sub-packages will be created under `internal/`:
     - `internal/env/`: Handles environment variable fetching, fallback parsing, and value cleaning.
     - `internal/telegram/`: Wraps the Telegram Bot API communication, sending messages, and fetching updates.
-    - `internal/monitor/`: Implements Antigravity thread process scanning, sqlite step inspection, and formatting.
+    - `internal/harnesses/`: Modular directory containing logic for individual harnesses (e.g., `internal/harnesses/agy.go` containing Antigravity process/database scanning).
+    - `internal/monitor/`: Implements thread process scanning, sqlite step inspection, and formatting, utilizing the specific harness packages.
     - `internal/status/`: Collects and formats system, tmux, and thread statuses.
     - `internal/server/`: Implements the Telegram bot background daemon receiver loop.
     - `internal/check/`: Verifies local installations of tmux and its configuration.

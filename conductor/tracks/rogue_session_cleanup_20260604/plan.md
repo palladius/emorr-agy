@@ -1,9 +1,9 @@
 # Implementation Plan: Sync and Cleanup Rogue Session Changes
 
-## Phase 1: Automated Test & Coverage Verification
-- [ ] Task 1.1: Write/verify unit tests for daemon startup notification filter and server/status commands.
-- [ ] Task 1.2: Run tests to verify they pass and measure coverage for `main.go`.
-- [ ] Task 1.3: Conductor - User Manual Verification 'Phase 1: Automated Test & Coverage Verification' (Protocol in workflow.md)
+## Phase 1: Automated Test & Coverage Verification [checkpoint: 7bd9e96]
+- [x] Task 1.1: Write/verify unit tests for daemon startup notification filter and server/status commands. c732089
+- [x] Task 1.2: Run tests to verify they pass and measure coverage for `main.go`. c732089
+- [x] Task 1.3: Conductor - User Manual Verification 'Phase 1: Automated Test & Coverage Verification' (Protocol in workflow.md) 7bd9e96
 
 ## Phase 2: Compilation & Execution Validation
 - [ ] Task 2.1: Build the project using `just` and verify `bin/emorr-agy` is produced.

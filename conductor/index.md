@@ -23,9 +23,10 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 - [rogue_session_cleanup_20260604](tracks/rogue_session_cleanup_20260604/index.md) (completed)
 - [harness_discovery_20260604](tracks/harness_discovery_20260604/index.md) (planned)
 - [codebase_modularization_20260604](tracks/codebase_modularization_20260604/index.md) (planned)
-- [session_classification_20260604](tracks/session_classification_20260604/index.md) (planned)
-- [telegram_audio_messages_20260604](tracks/telegram_audio_messages_20260604/index.md) (planned)
+- [session_classification_20260604](tracks/session_classification_20260604/index.md) (completed)
+- [telegram_audio_messages_20260604](tracks/telegram_audio_messages_20260604/index.md) (completed)
 - [audio_transcription_model_fix_20260604](tracks/audio_transcription_model_fix_20260604/index.md) (completed)
+- [shell_autocompletion_20260604](tracks/shell_autocompletion_20260604/index.md) (planned)
 
 ## References
 - [Product Guide](product.md)
@@ -55,15 +56,21 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 ---
 
-- [ ] **Track: lets have a GOOD think at this: https://github.com/palladius/emorr-agy/issues/4**
+- [x] **Track: lets have a GOOD think at this: https://github.com/palladius/emorr-agy/issues/4**
 *Link: [./tracks/session_classification_20260604/](./tracks/session_classification_20260604/)*
 
 ---
 
-- [ ] **Track: Telegram should support audio messgaes**
+- [x] **Track: Telegram should support audio messgaes**
 *Link: [./tracks/telegram_audio_messages_20260604/](./tracks/telegram_audio_messages_20260604/)*
 
 ---
 
 - [x] **Track: Fix audio transcription model and print server version in stdout**
 *Link: [./tracks/audio_transcription_model_fix_20260604/](./tracks/audio_transcription_model_fix_20260604/)*
+
+---
+
+- [ ] **Track: Shell autocompletion for emorr-agy subcommands and dynamic session IDs in Bash/Zsh.**
+*Link: [./tracks/shell_autocompletion_20260604/](./tracks/shell_autocompletion_20260604/)*
+

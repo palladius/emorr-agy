@@ -23,6 +23,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 - [rogue_session_cleanup_20260604](tracks/rogue_session_cleanup_20260604/index.md) (completed)
 - [harness_discovery_20260604](tracks/harness_discovery_20260604/index.md) (planned)
 - [codebase_modularization_20260604](tracks/codebase_modularization_20260604/index.md) (planned)
+- [session_classification_20260604](tracks/session_classification_20260604/index.md) (planned)
 
 ## References
 - [Product Guide](product.md)
@@ -49,3 +50,8 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 - [ ] **Track: Restructure codebase to use multiple modular files in subdirectories**
 *Link: [./tracks/codebase_modularization_20260604/](./tracks/codebase_modularization_20260604/)*
+
+---
+
+- [ ] **Track: lets have a GOOD think at this: https://github.com/palladius/emorr-agy/issues/4**
+*Link: [./tracks/session_classification_20260604/](./tracks/session_classification_20260604/)*

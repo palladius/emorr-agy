@@ -8,3 +8,7 @@ build:
 
 telegram-test:
 	./bin/emorr-agy telegram send "🟢 Test message from emorr-agy CLI from justfile! [blood emoji]"
+
+clean:
+	rm -rf bin/ *.out
+

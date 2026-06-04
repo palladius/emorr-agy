@@ -97,4 +97,31 @@ func TestGeminiClassifier(t *testing.T) {
 			t.Errorf("expected empty log summary, got %q", res.About)
 		}
 	})
+
+	t.Run("Dynamic API URL with environment variables", func(t *testing.T) {
+		// Restore default temporarily to test dynamic URL construction
+		currentURL := geminiAPIURL
+		geminiAPIURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%s"
+		defer func() { geminiAPIURL = currentURL }()
+
+		classifier := NewGeminiClassifier("dummy-key", tempDir)
+
+		// 1. Without env override (defaulting to gemini-3.1-flash-lite)
+		t.Setenv("AUDIO_TRANSCRIPTION_GEMINI_MODEL", "")
+		t.Setenv("GEMINI_MODEL", "")
+		url := classifier.getAPIURL()
+		expected := "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=dummy-key"
+		if url != expected {
+			t.Errorf("expected %q, got %q", expected, url)
+		}
+
+		// 2. With env override
+		t.Setenv("AUDIO_TRANSCRIPTION_GEMINI_MODEL", "gemini-override-2")
+		url = classifier.getAPIURL()
+		expected = "https://generativelanguage.googleapis.com/v1beta/models/gemini-override-2:generateContent?key=dummy-key"
+		if url != expected {
+			t.Errorf("expected %q, got %q", expected, url)
+		}
+	})
 }
+

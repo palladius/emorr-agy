@@ -38,3 +38,15 @@ func GetEnvWithFallback(keys ...string) string {
 	}
 	return ""
 }
+
+// GetGeminiModel returns the configured Gemini model, checking
+// AUDIO_TRANSCRIPTION_GEMINI_MODEL and GEMINI_MODEL env vars,
+// defaulting to DefaultGeminiModel.
+func GetGeminiModel() string {
+	model := GetEnvWithFallback("AUDIO_TRANSCRIPTION_GEMINI_MODEL", "GEMINI_MODEL")
+	if model == "" {
+		return DefaultGeminiModel
+	}
+	return CleanValue(model)
+}
+

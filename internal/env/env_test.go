@@ -45,3 +45,31 @@ func TestGetEnvWithFallback(t *testing.T) {
 		t.Errorf("expected empty string, got %q", val)
 	}
 }
+
+func TestGetGeminiModel(t *testing.T) {
+	// 1. Test fallback default
+	t.Setenv("AUDIO_TRANSCRIPTION_GEMINI_MODEL", "")
+	t.Setenv("GEMINI_MODEL", "")
+	if model := GetGeminiModel(); model != DefaultGeminiModel {
+		t.Errorf("expected %q, got %q", DefaultGeminiModel, model)
+	}
+
+	// 2. Test GEMINI_MODEL
+	t.Setenv("GEMINI_MODEL", "gemini-test-1")
+	if model := GetGeminiModel(); model != "gemini-test-1" {
+		t.Errorf("expected gemini-test-1, got %q", model)
+	}
+
+	// 3. Test AUDIO_TRANSCRIPTION_GEMINI_MODEL overrides GEMINI_MODEL
+	t.Setenv("AUDIO_TRANSCRIPTION_GEMINI_MODEL", "gemini-test-2")
+	if model := GetGeminiModel(); model != "gemini-test-2" {
+		t.Errorf("expected gemini-test-2, got %q", model)
+	}
+
+	// 4. Test CleanValue is applied
+	t.Setenv("AUDIO_TRANSCRIPTION_GEMINI_MODEL", "'gemini-test-3'")
+	if model := GetGeminiModel(); model != "gemini-test-3" {
+		t.Errorf("expected gemini-test-3, got %q", model)
+	}
+}
+

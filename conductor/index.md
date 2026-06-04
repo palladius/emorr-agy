@@ -25,7 +25,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 - [codebase_modularization_20260604](tracks/codebase_modularization_20260604/index.md) (planned)
 - [session_classification_20260604](tracks/session_classification_20260604/index.md) (planned)
 - [telegram_audio_messages_20260604](tracks/telegram_audio_messages_20260604/index.md) (planned)
-- [audio_transcription_model_fix_20260604](tracks/audio_transcription_model_fix_20260604/index.md) (planned)
+- [audio_transcription_model_fix_20260604](tracks/audio_transcription_model_fix_20260604/index.md) (completed)
 
 ## References
 - [Product Guide](product.md)
@@ -65,5 +65,5 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 ---
 
-- [ ] **Track: Fix audio transcription model and print server version in stdout**
+- [x] **Track: Fix audio transcription model and print server version in stdout**
 *Link: [./tracks/audio_transcription_model_fix_20260604/](./tracks/audio_transcription_model_fix_20260604/)*

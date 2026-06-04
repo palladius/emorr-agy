@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/palladius/emorr-agy/internal/env"
 )
 
 var GeminiAPIURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%s"
@@ -70,7 +72,7 @@ func (g *GeminiTranscriber) Transcribe(audioPath, mimeType string) (*Transcripti
 		return nil, fmt.Errorf("failed to marshal request payload: %w", err)
 	}
 
-	apiURL := fmt.Sprintf(GeminiAPIURL, g.APIKey)
+	apiURL := g.getAPIURL()
 	client := &http.Client{Timeout: 30 * time.Second}
 	
 	resp, err := client.Post(apiURL, "application/json", bytes.NewBuffer(jsonData))
@@ -110,6 +112,15 @@ func (g *GeminiTranscriber) Transcribe(audioPath, mimeType string) (*Transcripti
 	}
 
 	return &result, nil
+}
+
+func (g *GeminiTranscriber) getAPIURL() string {
+	defaultURL := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%s"
+	if GeminiAPIURL != defaultURL {
+		return fmt.Sprintf(GeminiAPIURL, g.APIKey)
+	}
+	model := env.GetGeminiModel()
+	return fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, g.APIKey)
 }
 
 // MapLanguageToFlag maps an ISO language code to its flag emoji.

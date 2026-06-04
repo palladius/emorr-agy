@@ -635,7 +635,7 @@ func runServer() error {
 		return fmt.Errorf("TELEGRAM_BOT_ID is not configured in environment")
 	}
 
-	fmt.Printf("Server started with PID %d, listening to Telegram...\n", currentPID)
+	fmt.Printf("Server started (v%s) with PID %d, listening to Telegram...\n", Version, currentPID)
 	sendStartupNotification()
 
 	offset := 0

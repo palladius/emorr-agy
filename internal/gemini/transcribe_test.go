@@ -105,3 +105,25 @@ func TestMapLanguageToFlag(t *testing.T) {
 		}
 	}
 }
+
+func TestGetAPIURLDynamic(t *testing.T) {
+	transcriber := NewGeminiTranscriber("my-key")
+
+	// 1. Without env override (defaulting to gemini-3.1-flash-lite)
+	t.Setenv("AUDIO_TRANSCRIPTION_GEMINI_MODEL", "")
+	t.Setenv("GEMINI_MODEL", "")
+	url := transcriber.getAPIURL()
+	expected := "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=my-key"
+	if url != expected {
+		t.Errorf("expected %q, got %q", expected, url)
+	}
+
+	// 2. With env override
+	t.Setenv("AUDIO_TRANSCRIPTION_GEMINI_MODEL", "gemini-test-override")
+	url = transcriber.getAPIURL()
+	expected = "https://generativelanguage.googleapis.com/v1beta/models/gemini-test-override:generateContent?key=my-key"
+	if url != expected {
+		t.Errorf("expected %q, got %q", expected, url)
+	}
+}
+

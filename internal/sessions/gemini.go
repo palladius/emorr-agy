@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"github.com/palladius/emorr-agy/internal/env"
 )
 
 type GeminiClassifier struct {
@@ -50,7 +52,7 @@ func (g *GeminiClassifier) Classify(sessionID string) (*LLMResult, error) {
 	}
 
 	// 2. Prepare API Request
-	apiURL := fmt.Sprintf(geminiAPIURL, g.APIKey)
+	apiURL := g.getAPIURL()
 
 	prompt := fmt.Sprintf(`Analyze the following conversation logs of an autonomous coding agent.
 Summarize what the agent was working on in a single sentence, check if it's currently waiting on user input (e.g. asking a question, finished task, or explicitly paused), and decide if it is worth resuscitating (resuming) or if it has finished/failed and should remain dead.
@@ -145,4 +147,13 @@ func (g *GeminiClassifier) getConversationLog(sessionID string) (string, error) 
 		}
 	}
 	return string(cleaned), nil
+}
+
+func (g *GeminiClassifier) getAPIURL() string {
+	defaultURL := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%s"
+	if geminiAPIURL != defaultURL {
+		return fmt.Sprintf(geminiAPIURL, g.APIKey)
+	}
+	model := env.GetGeminiModel()
+	return fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, g.APIKey)
 }

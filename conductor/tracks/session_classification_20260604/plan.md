@@ -1,10 +1,10 @@
 # Implementation Plan: Harness Session Classification & Management
 
-## Phase 1: Session Classification Engine & Exclusions
+## Phase 1: Session Classification Engine & Exclusions [checkpoint: 61fae95]
 - [x] Task 1.1: Write unit tests verifying session classification logic (mocking tmux sessions and config json dirs) and exclusion rules. (6239ec9)
 - [x] Task 1.2: Implement classification logic in `internal/sessions/classify.go` classifying active tmux sessions and config JSON files into the 4 states, including standard harness prefixes (`emagy-`, `emgem-`, `emcld-`). (6e2592f)
 - [x] Task 1.3: Support resuscitation exclusions via `EXCLUDE_RESUSCITATE` and defaults (`*Chumbia*`, `*chumbawamba*`). (6e2592f)
-- [~] Task 1.4: Conductor - User Manual Verification 'Phase 1: Session Classification Engine & Exclusions' (Protocol in workflow.md)
+- [x] Task 1.4: Conductor - User Manual Verification 'Phase 1: Session Classification Engine & Exclusions' (Protocol in workflow.md) (61fae95)
 
 ## Phase 2: Sessions List Subcommand
 - [ ] Task 2.1: Write unit tests for `sessions list` command outputs, formats (`--short`, `--long`, `--json`), and filtering by `--harness`.

@@ -92,39 +92,7 @@ func ShowSession(w io.Writer, engine *ClassificationEngine, sessionID string, op
 
 	printLastTranscriptLines(w, engine.fs, engine.homeDir, target.ID, DefaultLastLinesCount)
 
-	if !opts.Classify {
-		return nil
-	}
-
-	if classifier == nil {
-		return fmt.Errorf("classifier interface not provided for classification request")
-	}
-
-	// 1. Concurrency Locking
-	lockDir := filepath.Join(engine.homeDir, ".emorr-agy/locks")
-	lockPath := filepath.Join(lockDir, sessionID+".lock")
-
-	if lockData, err := engine.fs.ReadFile(lockPath); err == nil {
-		if pid, err := strconv.Atoi(string(lockData)); err == nil {
-			if isPIDActive(pid) {
-				return fmt.Errorf("another script PID %d is doing this, try again later", pid)
-			}
-		}
-	}
-
-	// Create locks directory
-	_ = engine.fs.MkdirAll(lockDir, 0755)
-
-	// Write lock file
-	myPID := os.Getpid()
-	if err := engine.fs.WriteFile(lockPath, []byte(strconv.Itoa(myPID)), 0644); err != nil {
-		return fmt.Errorf("failed to write lock file: %w", err)
-	}
-	defer func() {
-		_ = engine.fs.Remove(lockPath)
-	}()
-
-	// 2. Cache Checking
+	// 1. Cache Checking
 	cacheDir := filepath.Join(engine.homeDir, ".emorr-agy/cache")
 	cachePath := filepath.Join(cacheDir, sessionID+".json")
 
@@ -136,8 +104,36 @@ func ShowSession(w io.Writer, engine *ClassificationEngine, sessionID string, op
 		}
 	}
 
-	// 3. LLM Classification (if not cached)
-	if result == nil {
+	// 2. Compute LLM Classification (if not cached and requested)
+	if result == nil && opts.Classify {
+		if classifier == nil {
+			return fmt.Errorf("classifier interface not provided for classification request")
+		}
+
+		// Concurrency Locking
+		lockDir := filepath.Join(engine.homeDir, ".emorr-agy/locks")
+		lockPath := filepath.Join(lockDir, sessionID+".lock")
+
+		if lockData, err := engine.fs.ReadFile(lockPath); err == nil {
+			if pid, err := strconv.Atoi(string(lockData)); err == nil {
+				if isPIDActive(pid) {
+					return fmt.Errorf("another script PID %d is doing this, try again later", pid)
+				}
+			}
+		}
+
+		// Create locks directory
+		_ = engine.fs.MkdirAll(lockDir, 0755)
+
+		// Write lock file
+		myPID := os.Getpid()
+		if err := engine.fs.WriteFile(lockPath, []byte(strconv.Itoa(myPID)), 0644); err != nil {
+			return fmt.Errorf("failed to write lock file: %w", err)
+		}
+		defer func() {
+			_ = engine.fs.Remove(lockPath)
+		}()
+
 		res, err := classifier.Classify(sessionID)
 		if err != nil {
 			return fmt.Errorf("classification failed: %w", err)
@@ -151,11 +147,13 @@ func ShowSession(w io.Writer, engine *ClassificationEngine, sessionID string, op
 		}
 	}
 
-	// 4. Output classification results
-	fmt.Fprintf(w, "\n--- LLM CLASSIFICATION ---\n")
-	fmt.Fprintf(w, "About:               %s\n", result.About)
-	fmt.Fprintf(w, "User Input Pending:  %t\n", result.UserInputPending)
-	fmt.Fprintf(w, "Worth Resuscitating: %t\n", result.WorthResuscitate)
+	// 3. Output classification results if available
+	if result != nil {
+		fmt.Fprintf(w, "\n--- LLM CLASSIFICATION ---\n")
+		fmt.Fprintf(w, "About:               %s\n", result.About)
+		fmt.Fprintf(w, "User Input Pending:  %t\n", result.UserInputPending)
+		fmt.Fprintf(w, "Worth Resuscitating: %t\n", result.WorthResuscitate)
+	}
 
 	return nil
 }

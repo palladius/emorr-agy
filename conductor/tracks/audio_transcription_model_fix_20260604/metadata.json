@@ -1,0 +1,8 @@
+{
+  "track_id": "audio_transcription_model_fix_20260604",
+  "type": "bug",
+  "status": "new",
+  "created_at": "2026-06-04T13:48:00Z",
+  "updated_at": "2026-06-04T13:48:00Z",
+  "description": "fix the server audio transcription for wrong model. Also should PRINTF server version in stdout like it does on telegram!"
+}

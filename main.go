@@ -17,6 +17,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/palladius/emorr-agy/internal/color"
 	"github.com/palladius/emorr-agy/internal/gemini"
+	"github.com/palladius/emorr-agy/internal/logger"
 	"github.com/palladius/emorr-agy/internal/sessions"
 	"github.com/palladius/emorr-agy/internal/telegram"
 )
@@ -492,7 +493,7 @@ func sendStartupNotification() {
 	msg := fmt.Sprintf("Emorr-Agy v%s started on %s", Version, hostname)
 	err = telegram.SendTelegramMessage(msg)
 	if err != nil {
-		log.Printf("Failed to send startup notification: %v", err)
+		logger.Errorf("Failed to send startup notification: %v", err)
 	}
 }
 
@@ -635,14 +636,21 @@ func runServer() error {
 		return fmt.Errorf("TELEGRAM_BOT_ID is not configured in environment")
 	}
 
-	fmt.Printf("Server started (v%s) with PID %d, listening to Telegram...\n", Version, currentPID)
+	// Initialize Logger
+	projectID := getEnvWithFallback("PROJECT_ID", "GCP_PROJECT", "GOOGLE_CLOUD_PROJECT")
+	if err := logger.Init(projectID); err != nil {
+		log.Printf("Warning: failed to initialize logger: %v", err)
+	}
+	defer logger.Close()
+
+	logger.Infof("Server started (v%s) with PID %d, listening to Telegram...", Version, currentPID)
 	sendStartupNotification()
 
 	offset := 0
 	for {
 		updates, err := telegram.GetTelegramUpdates(botToken, offset)
 		if err != nil {
-			log.Printf("Error getting updates: %v", err)
+			logger.Errorf("Error getting updates: %v", err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
@@ -672,23 +680,23 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 	chatID := update.Message.Chat.ID
 
 	if update.Message.Voice != nil {
-		log.Printf("Received voice message from chat %d", chatID)
+		logger.Infof("Received voice message from chat %d", chatID)
 		transcribedText, err := downloadAndTranscribe(botToken, update.Message.Voice.FileID, "audio/ogg", chatID)
 		if err != nil {
-			log.Printf("Failed to process voice message: %v", err)
+			logger.Errorf("Failed to process voice message: %v", err)
 			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("⚠️ Error processing voice message: %v", err))
 			return err
 		}
 		text = transcribedText
 	} else if update.Message.Audio != nil {
-		log.Printf("Received audio message from chat %d", chatID)
+		logger.Infof("Received audio message from chat %d", chatID)
 		mimeType := update.Message.Audio.MimeType
 		if mimeType == "" {
 			mimeType = "audio/mpeg"
 		}
 		transcribedText, err := downloadAndTranscribe(botToken, update.Message.Audio.FileID, mimeType, chatID)
 		if err != nil {
-			log.Printf("Failed to process audio message: %v", err)
+			logger.Errorf("Failed to process audio message: %v", err)
 			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("⚠️ Error processing audio message: %v", err))
 			return err
 		}
@@ -701,7 +709,7 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 		return nil
 	}
 
-	log.Printf("Routing command message from chat %d: %q", chatID, text)
+	logger.Infof("Routing command message from chat %d: %q", chatID, text)
 
 	switch {
 	case strings.HasPrefix(text, "/status") || text == "status":
@@ -755,7 +763,7 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 		}
 		err = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "📁 *Last 5 Sessions:*", markup)
 		if err != nil {
-			log.Printf("Failed to send sessions list: %v", err)
+			logger.Errorf("Failed to send sessions list: %v", err)
 		}
 
 	case strings.HasPrefix(text, "/list") || text == "list":
@@ -816,7 +824,7 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 		}
 		err = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "💬 *Sessions Pending Human Interaction:*", markup)
 		if err != nil {
-			log.Printf("Failed to send human-pending list: %v", err)
+			logger.Errorf("Failed to send human-pending list: %v", err)
 		}
 
 	case strings.HasPrefix(text, "/help") || strings.HasPrefix(text, "/start") || text == "help":
@@ -829,7 +837,7 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 
 func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) error {
 	data := cb.Data
-	log.Printf("Received callback query: ID=%s, Data=%q", cb.ID, data)
+	logger.Infof("Received callback query: ID=%s, Data=%q", cb.ID, data)
 
 	// Answer callback query immediately to stop spinner
 	_ = telegram.AnswerCallbackQuery(botToken, cb.ID, "")
@@ -881,7 +889,7 @@ func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) er
 		// Execute tmux send-keys
 		cmd := exec.Command("tmux", "send-keys", "-t", sessionID, optionID, "Enter")
 		if err := cmd.Run(); err != nil {
-			log.Printf("Failed to run tmux send-keys: %v", err)
+			logger.Errorf("Failed to run tmux send-keys: %v", err)
 			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("⚠️ Failed to send key %s to tmux session %s", optionID, sessionID))
 		}
 

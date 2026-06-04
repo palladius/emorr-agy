@@ -1,0 +1,8 @@
+{
+  "track_id": "server_logging_gcp_and_local_20260604",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-06-04T17:15:00Z",
+  "updated_at": "2026-06-04T17:15:00Z",
+  "description": "Implement local files logging (under log/) and GCP Cloud Logging integration for all external interactions (Telegram API, LLM, subprocess execution)."
+}

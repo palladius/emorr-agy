@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -190,8 +191,9 @@ func TestShowSessionWithTranscript(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "Last 5 lines:") {
-		t.Error("expected output to contain 'Last 5 lines:'")
+	expectedHeader := fmt.Sprintf("Last %d lines:", DefaultLastLinesCount)
+	if !strings.Contains(output, expectedHeader) {
+		t.Errorf("expected output to contain %q", expectedHeader)
 	}
 	if !strings.Contains(output, "[MODEL:PLANNER_RESPONSE] Running task details") {
 		t.Errorf("missing formatted planner response in output: %q", output)

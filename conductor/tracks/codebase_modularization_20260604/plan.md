@@ -1,8 +1,8 @@
 # Implementation Plan: Codebase Modularization
 
 ## Phase 1: Environment & Telegram Packages
-- [ ] Task 1.1: Create `internal/env/` package, write tests, and implement env-lookup and quote-cleaning logic.
-- [ ] Task 1.2: Create `internal/telegram/` package, write tests, and implement Telegram message wrappers.
+- [x] Task 1.1: Create `internal/env/` package, write tests, and implement env-lookup and quote-cleaning logic. 9a40446
+- [x] Task 1.2: Create `internal/telegram/` package, write tests, and implement Telegram message wrappers. 813f78c
 - [ ] Task 1.3: Conductor - User Manual Verification 'Phase 1: Environment & Telegram Packages' (Protocol in workflow.md)
 
 ## Phase 2: Core Subcommand Packages

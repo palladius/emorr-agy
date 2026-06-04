@@ -291,3 +291,35 @@ func BuildOptionsKeyboard(sessionID string, options []OptionButton) (string, err
 	}
 	return string(data), nil
 }
+
+// BuildMenuKeyboard constructs the inline keyboard markup JSON for the main menu options.
+func BuildMenuKeyboard() (string, error) {
+	markup := InlineKeyboardMarkup{
+		InlineKeyboard: [][]InlineKeyboardButton{
+			{
+				{
+					Text:         "📋 List Active (Waiting)",
+					CallbackData: "menu:list_active",
+				},
+			},
+			{
+				{
+					Text:         "🗂️ List All Sessions",
+					CallbackData: "menu:list_all",
+				},
+			},
+			{
+				{
+					Text:         "🔄 Restart Server",
+					CallbackData: "menu:restart_server",
+				},
+			},
+		},
+	}
+	data, err := json.Marshal(markup)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+

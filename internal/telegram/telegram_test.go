@@ -240,4 +240,23 @@ func TestBuildKeyboards(t *testing.T) {
 	if optDecoded.InlineKeyboard[1][0].Text != expectedTruncated {
 		t.Errorf("expected button text %q, got %q", expectedTruncated, optDecoded.InlineKeyboard[1][0].Text)
 	}
+
+	// 3. BuildMenuKeyboard
+	menuMarkup, err := BuildMenuKeyboard()
+	if err != nil {
+		t.Fatalf("BuildMenuKeyboard failed: %v", err)
+	}
+	var menuDecoded InlineKeyboardMarkup
+	if err := json.Unmarshal([]byte(menuMarkup), &menuDecoded); err != nil {
+		t.Fatalf("failed to decode menu markup: %v", err)
+	}
+	if len(menuDecoded.InlineKeyboard) != 3 {
+		t.Errorf("expected 3 menu rows, got %d", len(menuDecoded.InlineKeyboard))
+	}
+	if menuDecoded.InlineKeyboard[2][0].Text != "🔄 Restart Server" {
+		t.Errorf("expected text '🔄 Restart Server', got %q", menuDecoded.InlineKeyboard[2][0].Text)
+	}
+	if menuDecoded.InlineKeyboard[2][0].CallbackData != "menu:restart_server" {
+		t.Errorf("expected callback_data 'menu:restart_server', got %q", menuDecoded.InlineKeyboard[2][0].CallbackData)
+	}
 }

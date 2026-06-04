@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Printed application version on server startup stdout.
 - Added `just version` recipe to display the current application version.
 - Added `just show-logs` recipe to fetch the latest N logs from Cloud Logging for the resolved project (with support for `GCLOUD_IDENTITY` and auto-bypassing active service account impersonation).
+- Added an interactive inline menu keyboard for `/start`/`/help` (with quick-select buttons to list active, list all, or restart the server).
+- Added a `/restart` command and callback handler to allow clean, non-blocking restarts of the background bot server.
 
 ### Changed
 - Formatted `emorr-agy monitor` output as a clean table with AGE, STATE, and right-aligned DIRECTORY.

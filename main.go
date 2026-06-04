@@ -827,13 +827,44 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 			logger.Errorf("Failed to send human-pending list: %v", err)
 		}
 
-	case strings.HasPrefix(text, "/help") || strings.HasPrefix(text, "/start") || text == "help":
-		helpMsg := "📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads\n• `/list` - Show active sessions waiting on user interaction\n• `/listall` - Show the last 5 sessions of any state"
-		_ = telegram.SendTelegramMessageToChat(botToken, chatID, helpMsg)
+	case strings.HasPrefix(text, "/help") || strings.HasPrefix(text, "/start") || strings.HasPrefix(text, "/menu") || text == "help" || text == "menu":
+		helpMsg := "📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads\n• `/list` - Show active sessions waiting on user interaction\n• `/listall` - Show the last 5 sessions of any state\n• `/restart` - Restart the background bot server"
+		markup, err := telegram.BuildMenuKeyboard()
+		if err != nil {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, helpMsg)
+		} else {
+			_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, helpMsg, markup)
+		}
+
+	case strings.HasPrefix(text, "/restart") || text == "restart":
+		_ = telegram.SendTelegramMessageToChat(botToken, chatID, "🔄 *Restarting the emorr-agy server...*")
+		restartServer()
 	}
 
 	return nil
 }
+
+func restartServer() {
+	pid := os.Getpid()
+	execPath, err := os.Executable()
+	if err != nil {
+		execPath = "./bin/emorr-agy"
+	}
+
+	cmd := exec.Command("tmux", "has-session", "-t", "emorr-agy-server")
+	if err := cmd.Run(); err == nil {
+		restartCmd := fmt.Sprintf("sleep 1 && tmux send-keys -t emorr-agy-server C-c && sleep 1 && tmux send-keys -t emorr-agy-server '%s server' C-m", execPath)
+		go func() {
+			_ = exec.Command("bash", "-c", restartCmd).Start()
+		}()
+	} else {
+		restartCmd := fmt.Sprintf("sleep 1 && %s server & sleep 0.5 && kill %d", execPath, pid)
+		go func() {
+			_ = exec.Command("bash", "-c", restartCmd).Start()
+		}()
+	}
+}
+
 
 func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) error {
 	data := cb.Data
@@ -851,6 +882,97 @@ func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) er
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return err
+	}
+
+	if strings.HasPrefix(data, "menu:") {
+		action := strings.TrimPrefix(data, "menu:")
+		engine := sessions.NewClassificationEngine(sessions.RealTmuxRunner{}, sessions.OSFileSystem{}, homeDir)
+		switch action {
+		case "list_active":
+			allSessions, err := engine.Classify(nil)
+			if err != nil {
+				_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error listing sessions: %v", err))
+				return err
+			}
+			var filtered []sessions.Session
+			for _, s := range allSessions {
+				trimmedID := s.ID
+				if idx := strings.Index(s.ID, "-"); idx != -1 {
+					if strings.HasPrefix(s.ID, "emagy-") {
+						trimmedID = strings.TrimPrefix(s.ID, "emagy-")
+					} else if strings.HasPrefix(s.ID, "emgem-") {
+						trimmedID = strings.TrimPrefix(s.ID, "emgem-")
+					} else if strings.HasPrefix(s.ID, "emcld-") {
+						trimmedID = strings.TrimPrefix(s.ID, "emcld-")
+					}
+				}
+				activeConvs := engine.FindActiveConvs()
+				pid := activeConvs[trimmedID]
+				if pid == 0 {
+					pid = activeConvs[s.ID]
+				}
+				detailedState := sessions.InferDetailedState(homeDir, s.ID, s.State, pid)
+				if strings.Contains(detailedState, "Waiting on User") {
+					filtered = append(filtered, s)
+				}
+			}
+			limit := 5
+			if len(filtered) < limit {
+				limit = len(filtered)
+			}
+			selected := filtered[:limit]
+			if len(selected) == 0 {
+				_ = telegram.SendTelegramMessageToChat(botToken, chatID, "No sessions are currently waiting on human interaction.")
+				return nil
+			}
+			var btnInfos []telegram.SessionButton
+			for _, s := range selected {
+				btnInfos = append(btnInfos, telegram.SessionButton{
+					ID:     s.ID,
+					Folder: s.Folder,
+				})
+			}
+			markup, err := telegram.BuildSessionsKeyboard(btnInfos)
+			if err != nil {
+				_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error building keyboard: %v", err))
+				return err
+			}
+			_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "💬 *Sessions Pending Human Interaction:*", markup)
+
+		case "list_all":
+			allSessions, err := engine.Classify(nil)
+			if err != nil {
+				_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error listing sessions: %v", err))
+				return err
+			}
+			limit := 5
+			if len(allSessions) < limit {
+				limit = len(allSessions)
+			}
+			selected := allSessions[:limit]
+			if len(selected) == 0 {
+				_ = telegram.SendTelegramMessageToChat(botToken, chatID, "No sessions found.")
+				return nil
+			}
+			var btnInfos []telegram.SessionButton
+			for _, s := range selected {
+				btnInfos = append(btnInfos, telegram.SessionButton{
+					ID:     s.ID,
+					Folder: s.Folder,
+				})
+			}
+			markup, err := telegram.BuildSessionsKeyboard(btnInfos)
+			if err != nil {
+				_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error building keyboard: %v", err))
+				return err
+			}
+			_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "📁 *Last 5 Sessions:*", markup)
+
+		case "restart_server":
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, "🔄 *Restarting the emorr-agy server...*")
+			restartServer()
+		}
+		return nil
 	}
 
 	if strings.HasPrefix(data, "show:") {

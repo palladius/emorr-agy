@@ -30,8 +30,6 @@ func main() {
 
 	command := os.Args[1]
 
-	sendStartupNotification()
-
 	switch command {
 	case "telegram":
 		if len(os.Args) < 4 || os.Args[2] != "send" {
@@ -379,7 +377,7 @@ func sendStartupNotification() {
 	if err != nil {
 		hostname = "unknown"
 	}
-	msg := fmt.Sprintf("Emorragy v%s started on %s", Version, hostname)
+	msg := fmt.Sprintf("Emorr-Agy v%s started on %s", Version, hostname)
 	err = sendTelegramMessage(msg)
 	if err != nil {
 		log.Printf("Failed to send startup notification: %v", err)
@@ -522,6 +520,7 @@ func runServer() error {
 	}
 
 	fmt.Printf("Server started with PID %d, listening to Telegram...\n", currentPID)
+	sendStartupNotification()
 
 	offset := 0
 	for {

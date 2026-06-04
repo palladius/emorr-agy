@@ -12,9 +12,9 @@
 - [x] Task 2.3: Conductor - User Manual Verification 'Phase 2: Sessions List Subcommand' (Protocol in workflow.md) (3df234e)
 
 ## Phase 3: Sessions Show & LLM Classification
-- [~] Task 3.1: Write unit tests verifying `sessions show` command, file locking (PID locking), and LLM classification caching.
-- [ ] Task 3.2: Implement `sessions show` command detail display, including resuscitation/resume commands.
-- [ ] Task 3.3: Implement the `--classify` / `--llm` flag logic with caching (JSON cache file) and locking (PID lockfile under `~/.emorr-agy/locks/`).
+- [x] Task 3.1: Write unit tests verifying `sessions show` command, file locking (PID locking), and LLM classification caching. (f972643)
+- [~] Task 3.2: Implement `sessions show` command detail display, including resuscitation/resume commands.
+- [~] Task 3.3: Implement the `--classify` / `--llm` flag logic with caching (JSON cache file) and locking (PID lockfile under `~/.emorr-agy/locks/`).
 - [ ] Task 3.4: Conductor - User Manual Verification 'Phase 3: Sessions Show & LLM Classification' (Protocol in workflow.md)
 
 ## Phase 4: CLI Integration & Validation

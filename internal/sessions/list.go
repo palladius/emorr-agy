@@ -43,8 +43,9 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 	case "long":
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			color.Colorize("STATUS", color.Plain),
+			color.Colorize("TYPE", color.Plain),
 			color.Colorize("SESSION ID", color.Plain),
 			color.Colorize("AGE", color.Plain),
 			color.Colorize("DIRECTORY", color.Plain),
@@ -54,6 +55,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		)
 		for _, s := range sessions {
 			emoji := getEmojiForState(s.State)
+			harnessEmoji := getEmojiForHarness(s.Harness)
 			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
 
@@ -62,8 +64,9 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				ageColor = color.DarkGray
 			}
 
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				color.Colorize(emoji, color.Plain),
+				color.Colorize(harnessEmoji, color.Plain),
 				color.Colorize(s.ID, color.BoldWhite),
 				color.Colorize(age, ageColor),
 				color.Colorize(folder, color.Blue),
@@ -76,14 +79,16 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 	default: // "short" or fallback
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
 			color.Colorize("STATUS", color.Plain),
+			color.Colorize("TYPE", color.Plain),
 			color.Colorize("SESSION ID", color.Plain),
 			color.Colorize("AGE", color.Plain),
 			color.Colorize("DIRECTORY", color.Plain),
 		)
 		for _, s := range sessions {
 			emoji := getEmojiForState(s.State)
+			harnessEmoji := getEmojiForHarness(s.Harness)
 			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
 
@@ -92,8 +97,9 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				ageColor = color.DarkGray
 			}
 
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
 				color.Colorize(emoji, color.Plain),
+				color.Colorize(harnessEmoji, color.Plain),
 				color.Colorize(s.ID, color.BoldWhite),
 				color.Colorize(age, ageColor),
 				color.Colorize(folder, color.Blue),
@@ -103,6 +109,19 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 	}
 
 	return nil
+}
+
+func getEmojiForHarness(harness string) string {
+	switch harness {
+	case "gemini":
+		return "♊"
+	case "agy":
+		return "🍏"
+	case "claude":
+		return "🇫🇷"
+	default:
+		return "❓"
+	}
 }
 
 func getEmojiForState(state SessionState) string {

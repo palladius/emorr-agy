@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-06-04
+
+### Added
+- Colorized session lists and thread monitor outputs (respecting the `NO_COLOR` standard).
+- Display of the last 5 transcript lines in `sessions show` command (configurable via `DefaultLastLinesCount`).
+- Printed application version on server startup stdout.
+
+### Changed
+- Formatted `emorr-agy monitor` output as a clean table with AGE, STATE, and right-aligned DIRECTORY.
+- Simplified thread monitor states to clean text tags (`TOOL`, `USER`, `CLOSED`, `WRITING`) for perfect tabular alignment.
+- Corrected TMUX emoji padding to prevent tabwriter column shifts.
+- Switched default Gemini model to `gemini-3.1-flash-lite` to resolve v1beta 404 errors, with support for overrides via `AUDIO_TRANSCRIPTION_GEMINI_MODEL` and `GEMINI_MODEL` env vars.
+
 ## [0.1.1] - 2026-06-04
 
 ### Added

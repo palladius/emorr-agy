@@ -42,7 +42,7 @@ func TestShowSessionBasic(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "emagy-session-123") || !strings.Contains(output, "/workspace/proj") || !strings.Contains(output, "open_tmux") {
+	if !strings.Contains(output, "emagy-session-123") || !strings.Contains(output, "/workspace/proj") || !strings.Contains(output, "Working (Generating)") {
 		t.Errorf("missing basic session details: %q", output)
 	}
 }

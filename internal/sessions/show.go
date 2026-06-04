@@ -65,9 +65,26 @@ func ShowSession(w io.Writer, engine *ClassificationEngine, sessionID string, op
 		return fmt.Errorf("session %q not found", sessionID)
 	}
 
+	trimmedID := target.ID
+	if idx := strings.Index(target.ID, "-"); idx != -1 {
+		if strings.HasPrefix(target.ID, "emagy-") {
+			trimmedID = strings.TrimPrefix(target.ID, "emagy-")
+		} else if strings.HasPrefix(target.ID, "emgem-") {
+			trimmedID = strings.TrimPrefix(target.ID, "emgem-")
+		} else if strings.HasPrefix(target.ID, "emcld-") {
+			trimmedID = strings.TrimPrefix(target.ID, "emcld-")
+		}
+	}
+	activeConvs := engine.findActiveConvs()
+	pid := activeConvs[trimmedID]
+	if pid == 0 {
+		pid = activeConvs[target.ID]
+	}
+	detailedState := inferDetailedState(engine.homeDir, target.ID, target.State, pid)
+
 	fmt.Fprintf(w, "SESSION ID:     %s\n", target.ID)
 	fmt.Fprintf(w, "HARNESS:        %s\n", target.Harness)
-	fmt.Fprintf(w, "STATE:          %s\n", target.State)
+	fmt.Fprintf(w, "STATE:          %s\n", detailedState)
 	folder := strings.ReplaceAll(target.Folder, "/usr/local/google/home/ricc", "~")
 	fmt.Fprintf(w, "DIRECTORY:      %s\n", folder)
 	fmt.Fprintf(w, "PROCESS/WINDOW: %d\n", target.ProcessCount)
@@ -263,4 +280,140 @@ func formatTranscriptLine(raw string) string {
 	content = strings.Join(strings.Fields(content), " ")
 
 	return fmt.Sprintf("[%s:%s] %s", line.Source, line.Type, content)
+}
+
+func inferDetailedState(homeDir, sessionID string, baseState SessionState, pid int) string {
+	if baseState != StateOpenTmux && baseState != StateOpenAgy && baseState != StateOpenPrivate {
+		switch baseState {
+		case StateDeadResuscitatable:
+			return "dead_resuscitatable (💤)"
+		case StateDeadArchived:
+			return "dead_archived (⚫)"
+		default:
+			return string(baseState)
+		}
+	}
+
+	// 1. If running in tmux, check if the pane contents indicate it is waiting on user input
+	if baseState == StateOpenTmux || baseState == StateOpenPrivate {
+		if isTmuxPaneWaitingOnUser(sessionID) {
+			return "Waiting on User 💬"
+		}
+	}
+
+	// 2. Trim prefix for DB path
+	trimmedID := sessionID
+	if idx := strings.Index(sessionID, "-"); idx != -1 {
+		if strings.HasPrefix(sessionID, "emagy-") {
+			trimmedID = strings.TrimPrefix(sessionID, "emagy-")
+		} else if strings.HasPrefix(sessionID, "emgem-") {
+			trimmedID = strings.TrimPrefix(sessionID, "emgem-")
+		} else if strings.HasPrefix(sessionID, "emcld-") {
+			trimmedID = strings.TrimPrefix(sessionID, "emcld-")
+		}
+	}
+
+	dbPath := filepath.Join(homeDir, ".gemini/antigravity-cli/conversations", trimmedID+".db")
+
+	// 3. Check child processes of PID if PID is valid
+	if pid > 0 {
+		if hasChildProcesses(pid) {
+			return "Working (Tool Calling) 🛠️"
+		}
+	}
+
+	// 4. Check steps table in SQLite DB
+	stepType, status, err := getLatestStepFromDB(dbPath)
+	if err == nil {
+		if status == 3 { // Done
+			return "Waiting on User 💬"
+		} else if stepType > 0 {
+			return "Working (Tool Calling) 🛠️"
+		}
+	}
+
+	// Default to Generating for active sessions if we don't match any specific states
+	if baseState == StateOpenPrivate {
+		return "Working (Interactive Session) 🖥️"
+	}
+	return "Working (Generating) ✍️"
+}
+
+func isTmuxPaneWaitingOnUser(sessionID string) bool {
+	cmd := exec.Command("tmux", "capture-pane", "-p", "-t", sessionID)
+	if output, err := cmd.Output(); err == nil {
+		content := strings.ToLower(string(output))
+		indicators := []string{
+			"do you want to proceed?",
+			"> 1. yes",
+			">  1. yes",
+			"do you want to run",
+			"do you want to execute",
+			"do you want to allow",
+			"(y/n)",
+			"[y/n]",
+			"proceed?",
+			"approve?",
+			"press enter to",
+		}
+		for _, ind := range indicators {
+			if strings.Contains(content, ind) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasChildProcesses(parentPID int) bool {
+	files, err := os.ReadDir("/proc")
+	if err != nil {
+		return false
+	}
+	for _, file := range files {
+		if !file.IsDir() {
+			continue
+		}
+		pidStr := file.Name()
+		_, err := strconv.Atoi(pidStr)
+		if err != nil {
+			continue
+		}
+
+		statPath := filepath.Join("/proc", pidStr, "stat")
+		data, err := os.ReadFile(statPath)
+		if err != nil {
+			continue
+		}
+		content := string(data)
+		lastParen := strings.LastIndex(content, ")")
+		if lastParen == -1 {
+			continue
+		}
+		parts := strings.Fields(content[lastParen+2:])
+		if len(parts) >= 2 {
+			ppid, _ := strconv.Atoi(parts[1])
+			if ppid == parentPID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func getLatestStepFromDB(dbPath string) (int, int, error) {
+	cmd := exec.Command("sqlite3", dbPath, "select step_type, status from steps order by idx desc limit 1")
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	parts := strings.Split(strings.TrimSpace(string(output)), "|")
+	if len(parts) >= 2 {
+		stepType, _ := strconv.Atoi(parts[0])
+		status, _ := strconv.Atoi(parts[1])
+		return stepType, status, nil
+	}
+
+	return 0, 0, nil
 }

@@ -24,6 +24,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 - [harness_discovery_20260604](tracks/harness_discovery_20260604/index.md) (planned)
 - [codebase_modularization_20260604](tracks/codebase_modularization_20260604/index.md) (planned)
 - [session_classification_20260604](tracks/session_classification_20260604/index.md) (planned)
+- [telegram_audio_messages_20260604](tracks/telegram_audio_messages_20260604/index.md) (planned)
 
 ## References
 - [Product Guide](product.md)
@@ -55,3 +56,8 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 - [ ] **Track: lets have a GOOD think at this: https://github.com/palladius/emorr-agy/issues/4**
 *Link: [./tracks/session_classification_20260604/](./tracks/session_classification_20260604/)*
+
+---
+
+- [ ] **Track: Telegram should support audio messgaes**
+*Link: [./tracks/telegram_audio_messages_20260604/](./tracks/telegram_audio_messages_20260604/)*

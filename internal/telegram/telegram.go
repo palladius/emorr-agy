@@ -24,9 +24,25 @@ type TelegramUpdate struct {
 }
 
 type TelegramMessage struct {
-	MessageID int          `json:"message_id"`
-	Chat      TelegramChat `json:"chat"`
-	Text      string       `json:"text"`
+	MessageID int            `json:"message_id"`
+	Chat      TelegramChat   `json:"chat"`
+	Text      string         `json:"text"`
+	Voice     *TelegramVoice `json:"voice,omitempty"`
+	Audio     *TelegramAudio `json:"audio,omitempty"`
+}
+
+type TelegramVoice struct {
+	FileID   string `json:"file_id"`
+	Duration int    `json:"duration"`
+	MimeType string `json:"mime_type"`
+	FileSize int    `json:"file_size"`
+}
+
+type TelegramAudio struct {
+	FileID   string `json:"file_id"`
+	Duration int    `json:"duration"`
+	MimeType string `json:"mime_type"`
+	FileSize int    `json:"file_size"`
 }
 
 type TelegramChat struct {

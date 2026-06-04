@@ -12,9 +12,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
+
+const Version = "0.1.1"
 
 func main() {
 	// Load environment variables from .env if present
@@ -26,6 +29,8 @@ func main() {
 	}
 
 	command := os.Args[1]
+
+	sendStartupNotification()
 
 	switch command {
 	case "telegram":
@@ -46,6 +51,24 @@ func main() {
 			log.Fatalf("Error running monitor: %v", err)
 		}
 
+	case "status":
+		err := runStatus()
+		if err != nil {
+			log.Fatalf("Error running status: %v", err)
+		}
+
+	case "server":
+		err := runServer()
+		if err != nil {
+			log.Fatalf("Error running server: %v", err)
+		}
+
+	case "check":
+		err := runCheck()
+		if err != nil {
+			log.Fatalf("Error running check: %v", err)
+		}
+
 	default:
 		printUsage()
 		os.Exit(1)
@@ -54,8 +77,11 @@ func main() {
 
 func printUsage() {
 	fmt.Println("Usage:")
-	fmt.Println("  emorragy telegram send <message>   - Send a message to Telegram")
-	fmt.Println("  emorragy monitor                   - Monitor active agy threads with emojis")
+	fmt.Println("  emorr-agy telegram send <message>   - Send a message to Telegram")
+	fmt.Println("  emorr-agy monitor                   - Monitor active agy threads with emojis")
+	fmt.Println("  emorr-agy status                    - Show status of system, tmux, and threads")
+	fmt.Println("  emorr-agy server                    - Run the Telegram bot daemon receiver")
+	fmt.Println("  emorr-agy check                     - Verify tmux installation and mouse settings")
 }
 
 func sendTelegramMessage(text string) error {
@@ -346,4 +372,335 @@ func getLatestStep(dbPath string) (int, int, error) {
 	}
 
 	return 0, 0, nil
+}
+
+func sendStartupNotification() {
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown"
+	}
+	msg := fmt.Sprintf("Emorragy v%s started on %s", Version, hostname)
+	err = sendTelegramMessage(msg)
+	if err != nil {
+		log.Printf("Failed to send startup notification: %v", err)
+	}
+}
+
+func runStatus() error {
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown"
+	}
+
+	botToken := getEnvWithFallback("TELEGRAM_BOT_ID", "TELEGRAM_BOT_TOKEN", "TELEGRAM_APITOKEN")
+	botToken = cleanValue(botToken)
+	telegramConfigured := "❌ Not Configured"
+	if botToken != "" {
+		telegramConfigured = "✅ Configured"
+	}
+
+	homeDir, homeErr := os.UserHomeDir()
+	serverStatus := "❌ Not Running"
+	if homeErr == nil {
+		pidPath := filepath.Join(homeDir, ".emorr-agy-server.pid")
+		if data, err := os.ReadFile(pidPath); err == nil {
+			if oldPID, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil {
+				if _, err := os.Stat(fmt.Sprintf("/proc/%d", oldPID)); err == nil {
+					serverStatus = fmt.Sprintf("🟢 Running (PID %d)", oldPID)
+				}
+			}
+		}
+	}
+
+	fmt.Println("📡 Emorr-Agy Status:")
+	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Printf("Version:      v%s\n", Version)
+	fmt.Printf("Hostname:     %s\n", hostname)
+	fmt.Printf("Telegram:     %s\n", telegramConfigured)
+	fmt.Printf("Server:       %s\n", serverStatus)
+	fmt.Println()
+
+	// 1. Get tmux sessions
+	fmt.Println("Active tmux Sessions:")
+	fmt.Println("--------------------")
+	tmuxCmd := exec.Command("tmux", "list-sessions", "-F", "#S: #{?session_attached,attached,detached} (#{session_windows} windows)")
+	tmuxOutput, err := tmuxCmd.Output()
+	if err != nil {
+		fmt.Println("  No active tmux sessions found (or tmux server not running).")
+	} else {
+		lines := strings.Split(strings.TrimSpace(string(tmuxOutput)), "\n")
+		for _, line := range lines {
+			if line != "" {
+				fmt.Printf("  • %s\n", line)
+			}
+		}
+	}
+	fmt.Println()
+
+	// 2. Get Antigravity Thread counts
+	fmt.Println("Antigravity Threads:")
+	fmt.Println("-------------------")
+	if homeErr == nil {
+		cliPath := filepath.Join(homeDir, ".gemini/antigravity-cli")
+		openConvs, err := findOpenConversations(cliPath)
+		if err == nil {
+			activeCount := len(openConvs)
+			cacheFile := filepath.Join(cliPath, "cache/last_conversations.json")
+			var cacheConvs map[string]string
+			data, err := os.ReadFile(cacheFile)
+			if err == nil {
+				_ = json.Unmarshal(data, &cacheConvs)
+			}
+			closedCount := 0
+			for _, convID := range cacheConvs {
+				if _, ok := openConvs[convID]; !ok {
+					closedCount++
+				}
+			}
+			fmt.Printf("  🟢 %d Active Threads (monitoring)\n", activeCount)
+			fmt.Printf("  ⚫ %d Closed Threads (history)\n", closedCount)
+		} else {
+			fmt.Println("  Failed to query active threads.")
+		}
+	} else {
+		fmt.Println("  Failed to query active threads (home dir unavailable).")
+	}
+
+	return nil
+}
+
+// --- Server Subcommand Logic ---
+
+type TelegramUpdateResponse struct {
+	Ok     bool             `json:"ok"`
+	Result []TelegramUpdate `json:"result"`
+}
+
+type TelegramUpdate struct {
+	UpdateID int             `json:"update_id"`
+	Message  *TelegramMessage `json:"message"`
+}
+
+type TelegramMessage struct {
+	MessageID int           `json:"message_id"`
+	Chat      TelegramChat  `json:"chat"`
+	Text      string        `json:"text"`
+}
+
+type TelegramChat struct {
+	ID int64 `json:"id"`
+}
+
+func runServer() error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	pidPath := filepath.Join(homeDir, ".emorr-agy-server.pid")
+
+	// Check if already running
+	if data, err := os.ReadFile(pidPath); err == nil {
+		if oldPID, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil {
+			if _, err := os.Stat(fmt.Sprintf("/proc/%d", oldPID)); err == nil {
+				return fmt.Errorf("server is already running with PID %d", oldPID)
+			}
+		}
+	}
+
+	// Write current PID
+	currentPID := os.Getpid()
+	err = os.WriteFile(pidPath, []byte(strconv.Itoa(currentPID)), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write PID file: %w", err)
+	}
+	defer os.Remove(pidPath)
+
+	botToken := getEnvWithFallback("TELEGRAM_BOT_ID", "TELEGRAM_BOT_TOKEN", "TELEGRAM_APITOKEN")
+	botToken = cleanValue(botToken)
+	if botToken == "" {
+		return fmt.Errorf("TELEGRAM_BOT_ID is not configured in environment")
+	}
+
+	fmt.Printf("Server started with PID %d, listening to Telegram...\n", currentPID)
+
+	offset := 0
+	for {
+		updates, err := getTelegramUpdates(botToken, offset)
+		if err != nil {
+			log.Printf("Error getting updates: %v", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		for _, update := range updates {
+			if update.UpdateID >= offset {
+				offset = update.UpdateID + 1
+			}
+
+			if update.Message == nil {
+				continue
+			}
+
+			text := strings.TrimSpace(update.Message.Text)
+			chatID := update.Message.Chat.ID
+
+			log.Printf("Received message from chat %d: %q", chatID, text)
+
+			switch {
+			case strings.HasPrefix(text, "/status") || text == "status":
+				statusOutput, err := getStatusOutput()
+				if err != nil {
+					sendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error getting status: %v", err))
+				} else {
+					sendTelegramMessageToChat(botToken, chatID, statusOutput)
+				}
+
+			case strings.HasPrefix(text, "/monitor") || text == "monitor":
+				monitorOutput, err := getMonitorOutput()
+				if err != nil {
+					sendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error getting monitor: %v", err))
+				} else {
+					sendTelegramMessageToChat(botToken, chatID, monitorOutput)
+				}
+
+			case strings.HasPrefix(text, "/help") || strings.HasPrefix(text, "/start") || text == "help":
+				helpMsg := "📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads"
+				sendTelegramMessageToChat(botToken, chatID, helpMsg)
+			}
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func getTelegramUpdates(botToken string, offset int) ([]TelegramUpdate, error) {
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/getUpdates?offset=%d&timeout=10", botToken, offset)
+	
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("non-OK status: %s", resp.Status)
+	}
+
+	var updateResp TelegramUpdateResponse
+	err = json.NewDecoder(resp.Body).Decode(&updateResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return updateResp.Result, nil
+}
+
+func sendTelegramMessageToChat(botToken string, chatID int64, text string) error {
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
+	
+	resp, err := http.PostForm(apiURL, url.Values{
+		"chat_id":    {strconv.FormatInt(chatID, 10)},
+		"text":       {text},
+		"parse_mode": {"Markdown"},
+	})
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("received non-OK status: %s", resp.Status)
+	}
+
+	return nil
+}
+
+func getStatusOutput() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	cmd := exec.Command(exe, "status")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
+}
+
+func getMonitorOutput() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	cmd := exec.Command(exe, "monitor")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
+}
+
+func runCheck() error {
+	fmt.Println("🔍 Emorr-Agy System Check:")
+	fmt.Println("--------------------------------------------------------------------------------")
+
+	// 1. Check if tmux is installed
+	tmuxPath, err := exec.LookPath("tmux")
+	if err != nil {
+		fmt.Println("❌ tmux: Not installed (not found in PATH)")
+		return nil
+	}
+
+	versionCmd := exec.Command("tmux", "-V")
+	versionOutput, _ := versionCmd.Output()
+	tmuxVersion := strings.TrimSpace(string(versionOutput))
+	fmt.Printf("✅ tmux: Installed at %s (%s)\n", tmuxPath, tmuxVersion)
+
+	// 2. Check mouse and scrolling support in ~/.tmux.conf
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println("⚠️  Cannot check ~/.tmux.conf: Home directory unavailable")
+		return nil
+	}
+
+	tmuxConfPath := filepath.Join(homeDir, ".tmux.conf")
+	confExists := true
+	if _, err := os.Stat(tmuxConfPath); os.IsNotExist(err) {
+		confExists = false
+	}
+
+	if !confExists {
+		fmt.Println("❌ ~/.tmux.conf: File does not exist")
+		fmt.Println("   👉 Tip: Create ~/.tmux.conf and add 'set -g mouse on' to enable scrolling & mouse clicks.")
+		return nil
+	}
+
+	data, err := os.ReadFile(tmuxConfPath)
+	if err != nil {
+		fmt.Printf("❌ ~/.tmux.conf: Exists but failed to read: %v\n", err)
+		return nil
+	}
+
+	lines := strings.Split(string(data), "\n")
+	mouseEnabled := false
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.Contains(line, "set") && strings.Contains(line, "mouse") && strings.Contains(line, "on") {
+			mouseEnabled = true
+			break
+		}
+	}
+
+	if mouseEnabled {
+		fmt.Println("✅ ~/.tmux.conf: Mouse and scrolling support is enabled ('set -g mouse on')")
+	} else {
+		fmt.Println("❌ ~/.tmux.conf: Mouse support is not enabled")
+		fmt.Println("   👉 Tip: Add 'set -g mouse on' to ~/.tmux.conf to enable scrolling & mouse clicks.")
+	}
+
+	return nil
 }

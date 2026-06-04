@@ -1,0 +1,8 @@
+{
+  "track_id": "multiple_harnesses_20260604",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-06-04T09:44:00Z",
+  "updated_at": "2026-06-04T09:44:00Z",
+  "description": "Support multiple harnesses (Gemini CLI and Claude Code) in the monitor and status commands"
+}

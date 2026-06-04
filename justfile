@@ -4,7 +4,7 @@ list:
 
 build:
 	mkdir -p bin
-	GOROOT=/usr/lib/go go build -o bin/emorragy main.go
+	GOROOT=/usr/lib/go go build -o bin/emorr-agy main.go
 
 telegram-test:
-	./bin/emorragy telegram send "🟢 Test message from emorragy CLI from justfile! [blood emoji]"
+	./bin/emorr-agy telegram send "🟢 Test message from emorr-agy CLI from justfile! [blood emoji]"

@@ -180,3 +180,64 @@ func TestNetworkAndJSONErrors(t *testing.T) {
 		t.Error("expected JSON decoding error, got nil")
 	}
 }
+
+func TestBuildKeyboards(t *testing.T) {
+	// 1. BuildSessionsKeyboard
+	sessButtons := []SessionButton{
+		{ID: "emagy-260604-1117", Folder: "/git/gic/bin"},
+		{ID: "other-session", Folder: "/git/other"},
+	}
+	markup, err := BuildSessionsKeyboard(sessButtons)
+	if err != nil {
+		t.Fatalf("BuildSessionsKeyboard failed: %v", err)
+	}
+	var decoded InlineKeyboardMarkup
+	if err := json.Unmarshal([]byte(markup), &decoded); err != nil {
+		t.Fatalf("failed to decode sessions markup: %v", err)
+	}
+	if len(decoded.InlineKeyboard) != 2 {
+		t.Errorf("expected 2 keyboard rows, got %d", len(decoded.InlineKeyboard))
+	}
+	if decoded.InlineKeyboard[0][0].Text != "emagy-260604-1117 (bin)" {
+		t.Errorf("expected text 'emagy-260604-1117 (bin)', got %q", decoded.InlineKeyboard[0][0].Text)
+	}
+	if decoded.InlineKeyboard[0][0].CallbackData != "show:emagy-260604-1117" {
+		t.Errorf("expected callback_data 'show:emagy-260604-1117', got %q", decoded.InlineKeyboard[0][0].CallbackData)
+	}
+
+	// 2. BuildOptionsKeyboard
+	optButtons := []OptionButton{
+		{ID: "1", Text: "Yes"},
+		{ID: "2", Text: "No"},
+		{ID: "3", Text: "Long text option that will be truncated"},
+	}
+	optMarkup, err := BuildOptionsKeyboard("emagy-260604-1117", optButtons)
+	if err != nil {
+		t.Fatalf("BuildOptionsKeyboard failed: %v", err)
+	}
+	var optDecoded InlineKeyboardMarkup
+	if err := json.Unmarshal([]byte(optMarkup), &optDecoded); err != nil {
+		t.Fatalf("failed to decode options markup: %v", err)
+	}
+	// 3 options with 2 per row => 2 rows
+	if len(optDecoded.InlineKeyboard) != 2 {
+		t.Errorf("expected 2 option rows, got %d", len(optDecoded.InlineKeyboard))
+	}
+	if len(optDecoded.InlineKeyboard[0]) != 2 {
+		t.Errorf("expected row 0 to have 2 buttons, got %d", len(optDecoded.InlineKeyboard[0]))
+	}
+	if len(optDecoded.InlineKeyboard[1]) != 1 {
+		t.Errorf("expected row 1 to have 1 button, got %d", len(optDecoded.InlineKeyboard[1]))
+	}
+	if optDecoded.InlineKeyboard[0][0].Text != "1: Yes" {
+		t.Errorf("expected button text '1: Yes', got %q", optDecoded.InlineKeyboard[0][0].Text)
+	}
+	if optDecoded.InlineKeyboard[0][0].CallbackData != "exec:emagy-260604-1117:1" {
+		t.Errorf("expected callback_data 'exec:emagy-260604-1117:1', got %q", optDecoded.InlineKeyboard[0][0].CallbackData)
+	}
+	// Truncated text check
+	expectedTruncated := "3: Long text option that will ..."
+	if optDecoded.InlineKeyboard[1][0].Text != expectedTruncated {
+		t.Errorf("expected button text %q, got %q", expectedTruncated, optDecoded.InlineKeyboard[1][0].Text)
+	}
+}

@@ -660,6 +660,10 @@ func runServer() error {
 }
 
 func processUpdate(botToken string, update telegram.TelegramUpdate) error {
+	if update.CallbackQuery != nil {
+		return processCallbackQuery(botToken, *update.CallbackQuery)
+	}
+
 	if update.Message == nil {
 		return nil
 	}
@@ -716,9 +720,197 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 			_ = telegram.SendTelegramMessageToChat(botToken, chatID, monitorOutput)
 		}
 
+	case strings.HasPrefix(text, "/listall") || text == "listall":
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error finding home dir: %v", err))
+			return err
+		}
+		engine := sessions.NewClassificationEngine(sessions.RealTmuxRunner{}, sessions.OSFileSystem{}, homeDir)
+		allSessions, err := engine.Classify(nil)
+		if err != nil {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error listing sessions: %v", err))
+			return err
+		}
+		limit := 5
+		if len(allSessions) < limit {
+			limit = len(allSessions)
+		}
+		selected := allSessions[:limit]
+		if len(selected) == 0 {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, "No sessions found.")
+			return nil
+		}
+		var btnInfos []telegram.SessionButton
+		for _, s := range selected {
+			btnInfos = append(btnInfos, telegram.SessionButton{
+				ID:     s.ID,
+				Folder: s.Folder,
+			})
+		}
+		markup, err := telegram.BuildSessionsKeyboard(btnInfos)
+		if err != nil {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error building keyboard: %v", err))
+			return err
+		}
+		err = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "📁 *Last 5 Sessions:*", markup)
+		if err != nil {
+			log.Printf("Failed to send sessions list: %v", err)
+		}
+
+	case strings.HasPrefix(text, "/list") || text == "list":
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error finding home dir: %v", err))
+			return err
+		}
+		engine := sessions.NewClassificationEngine(sessions.RealTmuxRunner{}, sessions.OSFileSystem{}, homeDir)
+		allSessions, err := engine.Classify(nil)
+		if err != nil {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error listing sessions: %v", err))
+			return err
+		}
+		var filtered []sessions.Session
+		for _, s := range allSessions {
+			trimmedID := s.ID
+			if idx := strings.Index(s.ID, "-"); idx != -1 {
+				if strings.HasPrefix(s.ID, "emagy-") {
+					trimmedID = strings.TrimPrefix(s.ID, "emagy-")
+				} else if strings.HasPrefix(s.ID, "emgem-") {
+					trimmedID = strings.TrimPrefix(s.ID, "emgem-")
+				} else if strings.HasPrefix(s.ID, "emcld-") {
+					trimmedID = strings.TrimPrefix(s.ID, "emcld-")
+				}
+			}
+			activeConvs := engine.FindActiveConvs()
+			pid := activeConvs[trimmedID]
+			if pid == 0 {
+				pid = activeConvs[s.ID]
+			}
+			detailedState := sessions.InferDetailedState(homeDir, s.ID, s.State, pid)
+			if strings.Contains(detailedState, "Waiting on User") {
+				filtered = append(filtered, s)
+			}
+		}
+
+		limit := 5
+		if len(filtered) < limit {
+			limit = len(filtered)
+		}
+		selected := filtered[:limit]
+		if len(selected) == 0 {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, "No sessions are currently waiting on human interaction.")
+			return nil
+		}
+		var btnInfos []telegram.SessionButton
+		for _, s := range selected {
+			btnInfos = append(btnInfos, telegram.SessionButton{
+				ID:     s.ID,
+				Folder: s.Folder,
+			})
+		}
+		markup, err := telegram.BuildSessionsKeyboard(btnInfos)
+		if err != nil {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error building keyboard: %v", err))
+			return err
+		}
+		err = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "💬 *Sessions Pending Human Interaction:*", markup)
+		if err != nil {
+			log.Printf("Failed to send human-pending list: %v", err)
+		}
+
 	case strings.HasPrefix(text, "/help") || strings.HasPrefix(text, "/start") || text == "help":
-		helpMsg := "📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads"
+		helpMsg := "📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads\n• `/list` - Show active sessions waiting on user interaction\n• `/listall` - Show the last 5 sessions of any state"
 		_ = telegram.SendTelegramMessageToChat(botToken, chatID, helpMsg)
+	}
+
+	return nil
+}
+
+func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) error {
+	data := cb.Data
+	log.Printf("Received callback query: ID=%s, Data=%q", cb.ID, data)
+
+	// Answer callback query immediately to stop spinner
+	_ = telegram.AnswerCallbackQuery(botToken, cb.ID, "")
+
+	if cb.Message == nil {
+		return nil
+	}
+	chatID := cb.Message.Chat.ID
+	messageID := cb.Message.MessageID
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	if strings.HasPrefix(data, "show:") {
+		sessionID := strings.TrimPrefix(data, "show:")
+		details, opts, err := sessions.GetSessionDetailsAndOptions(homeDir, sessionID)
+		if err != nil {
+			_ = telegram.EditTelegramMessageText(botToken, chatID, messageID, fmt.Sprintf("Error retrieving details for %s: %v", sessionID, err), "")
+			return err
+		}
+
+		var optButtons []telegram.OptionButton
+		for _, o := range opts {
+			optButtons = append(optButtons, telegram.OptionButton{
+				ID:   o.ID,
+				Text: o.Text,
+			})
+		}
+
+		var markup string
+		if len(optButtons) > 0 {
+			markup, _ = telegram.BuildOptionsKeyboard(sessionID, optButtons)
+		}
+
+		_ = telegram.EditTelegramMessageText(botToken, chatID, messageID, details, markup)
+		return nil
+	}
+
+	if strings.HasPrefix(data, "exec:") {
+		parts := strings.Split(data, ":")
+		if len(parts) < 3 {
+			return fmt.Errorf("invalid callback data: %s", data)
+		}
+		sessionID := parts[1]
+		optionID := parts[2]
+
+		// Execute tmux send-keys
+		cmd := exec.Command("tmux", "send-keys", "-t", sessionID, optionID, "Enter")
+		if err := cmd.Run(); err != nil {
+			log.Printf("Failed to run tmux send-keys: %v", err)
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("⚠️ Failed to send key %s to tmux session %s", optionID, sessionID))
+		}
+
+		// Wait a small delay for terminal to react/draw next screen
+		time.Sleep(300 * time.Millisecond)
+
+		// Refresh the message details and options
+		details, opts, err := sessions.GetSessionDetailsAndOptions(homeDir, sessionID)
+		if err != nil {
+			// If session finished, update message
+			_ = telegram.EditTelegramMessageText(botToken, chatID, messageID, fmt.Sprintf("Session %s finished or became unavailable.", sessionID), "")
+			return nil
+		}
+
+		var optButtons []telegram.OptionButton
+		for _, o := range opts {
+			optButtons = append(optButtons, telegram.OptionButton{
+				ID:   o.ID,
+				Text: o.Text,
+			})
+		}
+
+		var markup string
+		if len(optButtons) > 0 {
+			markup, _ = telegram.BuildOptionsKeyboard(sessionID, optButtons)
+		}
+
+		_ = telegram.EditTelegramMessageText(botToken, chatID, messageID, details, markup)
+		return nil
 	}
 
 	return nil

@@ -75,12 +75,12 @@ func ShowSession(w io.Writer, engine *ClassificationEngine, sessionID string, op
 			trimmedID = strings.TrimPrefix(target.ID, "emcld-")
 		}
 	}
-	activeConvs := engine.findActiveConvs()
+	activeConvs := engine.FindActiveConvs()
 	pid := activeConvs[trimmedID]
 	if pid == 0 {
 		pid = activeConvs[target.ID]
 	}
-	detailedState := inferDetailedState(engine.homeDir, target.ID, target.State, pid)
+	detailedState := InferDetailedState(engine.homeDir, target.ID, target.State, pid)
 
 	fmt.Fprintf(w, "SESSION ID:     %s\n", target.ID)
 	fmt.Fprintf(w, "HARNESS:        %s\n", target.Harness)
@@ -282,7 +282,7 @@ func formatTranscriptLine(raw string) string {
 	return fmt.Sprintf("[%s:%s] %s", line.Source, line.Type, content)
 }
 
-func inferDetailedState(homeDir, sessionID string, baseState SessionState, pid int) string {
+func InferDetailedState(homeDir, sessionID string, baseState SessionState, pid int) string {
 	if baseState != StateOpenTmux && baseState != StateOpenAgy && baseState != StateOpenPrivate {
 		switch baseState {
 		case StateDeadResuscitatable:
@@ -416,4 +416,83 @@ func getLatestStepFromDB(dbPath string) (int, int, error) {
 	}
 
 	return 0, 0, nil
+}
+
+// GetSessionDetailsAndOptions returns formatted details of a session, its last 10 lines of tmux pane, and any parsed option choices.
+func GetSessionDetailsAndOptions(homeDir string, sessionID string) (string, []PaneOption, error) {
+	engine := NewClassificationEngine(RealTmuxRunner{}, OSFileSystem{}, homeDir)
+	sessions, err := engine.Classify(nil)
+	if err != nil {
+		return "", nil, err
+	}
+
+	var target *Session
+	for i := range sessions {
+		if sessions[i].ID == sessionID {
+			target = &sessions[i]
+			break
+		}
+	}
+	if target == nil {
+		return "", nil, fmt.Errorf("session %q not found", sessionID)
+	}
+
+	trimmedID := target.ID
+	if idx := strings.Index(target.ID, "-"); idx != -1 {
+		if strings.HasPrefix(target.ID, "emagy-") {
+			trimmedID = strings.TrimPrefix(target.ID, "emagy-")
+		} else if strings.HasPrefix(target.ID, "emgem-") {
+			trimmedID = strings.TrimPrefix(target.ID, "emgem-")
+		} else if strings.HasPrefix(target.ID, "emcld-") {
+			trimmedID = strings.TrimPrefix(target.ID, "emcld-")
+		}
+	}
+	activeConvs := engine.FindActiveConvs()
+	pid := activeConvs[trimmedID]
+	if pid == 0 {
+		pid = activeConvs[target.ID]
+	}
+	detailedState := InferDetailedState(homeDir, target.ID, target.State, pid)
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("*SESSION ID:* %s\n", target.ID))
+	sb.WriteString(fmt.Sprintf("*HARNESS:*    %s\n", target.Harness))
+	sb.WriteString(fmt.Sprintf("*STATE:*      %s\n", detailedState))
+	folder := strings.ReplaceAll(target.Folder, "/usr/local/google/home/ricc", "~")
+	sb.WriteString(fmt.Sprintf("*DIRECTORY:*  %s\n", folder))
+	sb.WriteString(fmt.Sprintf("*PROCESS/WINDOW:* %d\n", target.ProcessCount))
+	sb.WriteString(fmt.Sprintf("*RESUME CMD:* `%s`\n", target.ResumeCommand))
+
+	// Get last 10 lines
+	var tmuxLines []string
+	cmd := exec.Command("tmux", "capture-pane", "-p", "-t", target.ID)
+	if output, err := cmd.Output(); err == nil {
+		rawLines := strings.Split(string(output), "\n")
+		for _, line := range rawLines {
+			tmuxLines = append(tmuxLines, line)
+		}
+		for len(tmuxLines) > 0 && strings.TrimSpace(tmuxLines[len(tmuxLines)-1]) == "" {
+			tmuxLines = tmuxLines[:len(tmuxLines)-1]
+		}
+	}
+
+	sb.WriteString("\n*Last 10 lines (captured from tmux pane):*\n")
+	sb.WriteString("------------\n")
+	if len(tmuxLines) > 0 {
+		start := len(tmuxLines) - 10
+		if start < 0 {
+			start = 0
+		}
+		var outputLines []string
+		for i := start; i < len(tmuxLines); i++ {
+			outputLines = append(outputLines, tmuxLines[i])
+			sb.WriteString(fmt.Sprintf("`%s`\n", tmuxLines[i]))
+		}
+		// Parse options from these captured lines
+		opts := ParsePaneOptions(outputLines)
+		return sb.String(), opts, nil
+	}
+
+	sb.WriteString("(no active tmux output or pane exited)\n")
+	return sb.String(), nil, nil
 }

@@ -148,3 +148,182 @@ func TestProcessVoiceUpdateIntegration(t *testing.T) {
 		t.Fatalf("unexpected error processing update: %v", err)
 	}
 }
+
+func TestInteractiveCommandsIntegration(t *testing.T) {
+	// 1. Create a temp directory for mock home and mock tmux bin
+	tempDir := t.TempDir()
+	mockBinDir := filepath.Join(tempDir, "bin")
+	if err := os.MkdirAll(mockBinDir, 0755); err != nil {
+		t.Fatalf("failed to create mock bin dir: %v", err)
+	}
+
+	// Create a mock tmux executable script
+	mockTmuxContent := `#!/bin/bash
+if [[ "$1" == "list-sessions" ]]; then
+  echo -e "emagy-260604-1117\t/git/gic/bin\t0\t1"
+elif [[ "$1" == "capture-pane" ]]; then
+  echo "  Requesting permission for: git ls-files"
+  echo "Do you want to proceed?"
+  echo "> 1. Yes"
+  echo "  2. Yes, and always allow in this conversation"
+  echo "  3. Yes, and always allow for commands"
+  echo "  4. No"
+elif [[ "$1" == "send-keys" ]]; then
+  # check command options/parameters if needed
+  exit 0
+fi
+`
+	tmuxPath := filepath.Join(mockBinDir, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte(mockTmuxContent), 0755); err != nil {
+		t.Fatalf("failed to write mock tmux script: %v", err)
+	}
+
+	// Prepend mockBinDir to PATH
+	originalPath := os.Getenv("PATH")
+	t.Setenv("PATH", mockBinDir+":"+originalPath)
+
+	// Set HOME directory to redirect config locations
+	t.Setenv("HOME", tempDir)
+
+	// Write mock db and cache folders to make sure ClassificationEngine lists them if needed
+	cliCacheDir := filepath.Join(tempDir, ".gemini/antigravity-cli/cache")
+	if err := os.MkdirAll(cliCacheDir, 0755); err != nil {
+		t.Fatalf("failed to create cache dir: %v", err)
+	}
+	// Historical session cache JSON
+	lastConvsContent := `{"/git/gic/bin": "emagy-260604-1117"}`
+	if err := os.WriteFile(filepath.Join(cliCacheDir, "last_conversations.json"), []byte(lastConvsContent), 0644); err != nil {
+		t.Fatalf("failed to write last_conversations.json: %v", err)
+	}
+
+	// 2. Set up mock Telegram server
+	var lastSentText string
+	var lastSentMarkup string
+	var lastMethod string
+
+	telegramServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = r.ParseForm()
+		
+		lastMethod = r.URL.Path
+		if strings.Contains(r.URL.Path, "sendMessage") || strings.Contains(r.URL.Path, "editMessageText") {
+			lastSentText = r.Form.Get("text")
+			lastSentMarkup = r.Form.Get("reply_markup")
+		}
+		
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer telegramServer.Close()
+
+	// Redirect telegram endpoints
+	oldTelegramBaseURL := telegram.BaseURL
+	telegram.BaseURL = telegramServer.URL
+	defer func() {
+		telegram.BaseURL = oldTelegramBaseURL
+	}()
+
+	// 3. Test "/list" command (waiting on user interaction)
+	listUpdate := telegram.TelegramUpdate{
+		UpdateID: 1001,
+		Message: &telegram.TelegramMessage{
+			MessageID: 101,
+			Chat: telegram.TelegramChat{
+				ID: 12345,
+			},
+			Text: "/list",
+		},
+	}
+
+	err := processUpdate("bot-token", listUpdate)
+	if err != nil {
+		t.Fatalf("processUpdate failed for /list: %v", err)
+	}
+
+	if !strings.Contains(lastSentText, "Sessions Pending Human Interaction:") {
+		t.Errorf("expected text to contain sessions header, got %q", lastSentText)
+	}
+	if !strings.Contains(lastSentMarkup, "emagy-260604-1117") {
+		t.Errorf("expected markup to contain session button, got %q", lastSentMarkup)
+	}
+
+	// 4. Test "/listall" command (all sessions)
+	listAllUpdate := telegram.TelegramUpdate{
+		UpdateID: 1002,
+		Message: &telegram.TelegramMessage{
+			MessageID: 102,
+			Chat: telegram.TelegramChat{
+				ID: 12345,
+			},
+			Text: "/listall",
+		},
+	}
+
+	err = processUpdate("bot-token", listAllUpdate)
+	if err != nil {
+		t.Fatalf("processUpdate failed for /listall: %v", err)
+	}
+
+	if !strings.Contains(lastSentText, "Last 5 Sessions:") {
+		t.Errorf("expected text to contain listall header, got %q", lastSentText)
+	}
+	if !strings.Contains(lastSentMarkup, "emagy-260604-1117") {
+		t.Errorf("expected markup to contain session button, got %q", lastSentMarkup)
+	}
+
+	// 5. Test callback query "show:emagy-260604-1117"
+	showCallbackUpdate := telegram.TelegramUpdate{
+		UpdateID: 1003,
+		CallbackQuery: &telegram.TelegramCallbackQuery{
+			ID: "query-abc",
+			Message: &telegram.TelegramMessage{
+				MessageID: 201,
+				Chat: telegram.TelegramChat{
+					ID: 12345,
+				},
+			},
+			Data: "show:emagy-260604-1117",
+		},
+	}
+
+	err = processUpdate("bot-token", showCallbackUpdate)
+	if err != nil {
+		t.Fatalf("processUpdate failed for callback query: %v", err)
+	}
+
+	if !strings.Contains(lastSentText, "SESSION ID:* emagy-260604-1117") {
+		t.Errorf("expected details to contain session ID, got %q", lastSentText)
+	}
+	if !strings.Contains(lastSentText, "Requesting permission for: git ls-files") {
+		t.Errorf("expected details to contain pane output, got %q", lastSentText)
+	}
+	// Option buttons markup check
+	if !strings.Contains(lastSentMarkup, "exec:emagy-260604-1117:1") || !strings.Contains(lastSentMarkup, "1: Yes") {
+		t.Errorf("expected markup to contain option buttons, got %q", lastSentMarkup)
+	}
+
+	// 6. Test callback query "exec:emagy-260604-1117:1"
+	execCallbackUpdate := telegram.TelegramUpdate{
+		UpdateID: 1004,
+		CallbackQuery: &telegram.TelegramCallbackQuery{
+			ID: "query-def",
+			Message: &telegram.TelegramMessage{
+				MessageID: 201,
+				Chat: telegram.TelegramChat{
+					ID: 12345,
+				},
+			},
+			Data: "exec:emagy-260604-1117:1",
+		},
+	}
+
+	err = processUpdate("bot-token", execCallbackUpdate)
+	if err != nil {
+		t.Fatalf("processUpdate failed for exec callback: %v", err)
+	}
+
+	// It should have executed the command and updated message
+	if !strings.Contains(lastMethod, "editMessageText") {
+		t.Errorf("expected last method to be editMessageText, got %q", lastMethod)
+	}
+}

@@ -116,7 +116,7 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 	runningMap := make(map[string]bool)
 
 	// A. Find all active conversations based on open DB locks
-	activeConvs := c.findActiveConvs()
+	activeConvs := c.FindActiveConvs()
 
 	// 1. Get running tmux sessions
 	tmuxSessions, err := c.tmux.ListSessions()
@@ -260,7 +260,7 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 	return sessions, nil
 }
 
-func (c *ClassificationEngine) findActiveConvs() map[string]int {
+func (c *ClassificationEngine) FindActiveConvs() map[string]int {
 	active := make(map[string]int)
 	files, err := c.fs.ReadDir("/proc")
 	if err != nil {

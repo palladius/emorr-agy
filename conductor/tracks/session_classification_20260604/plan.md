@@ -7,8 +7,8 @@
 - [x] Task 1.4: Conductor - User Manual Verification 'Phase 1: Session Classification Engine & Exclusions' (Protocol in workflow.md) (61fae95)
 
 ## Phase 2: Sessions List Subcommand
-- [~] Task 2.1: Write unit tests for `sessions list` command outputs, formats (`--short`, `--long`, `--json`), and filtering by `--harness`.
-- [ ] Task 2.2: Implement `sessions list` command integration in `internal/sessions/list.go` with tabular output styling, emojis, and JSON format option.
+- [x] Task 2.1: Write unit tests for `sessions list` command outputs, formats (`--short`, `--long`, `--json`), and filtering by `--harness`. (4c33b77)
+- [~] Task 2.2: Implement `sessions list` command integration in `internal/sessions/list.go` with tabular output styling, emojis, and JSON format option.
 - [ ] Task 2.3: Conductor - User Manual Verification 'Phase 2: Sessions List Subcommand' (Protocol in workflow.md)
 
 ## Phase 3: Sessions Show & LLM Classification

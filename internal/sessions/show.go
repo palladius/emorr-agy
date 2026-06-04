@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/palladius/emorr-agy/internal/color"
 )
 
 type ShowOptions struct {
@@ -142,6 +144,31 @@ func ShowSession(w io.Writer, engine *ClassificationEngine, sessionID string, op
 }
 
 func printLastTranscriptLines(w io.Writer, fs FileSystem, homeDir, sessionID string, count int) {
+	// 1. Try to capture from tmux pane first if active
+	cmd := exec.Command("tmux", "capture-pane", "-p", "-t", sessionID)
+	if output, err := cmd.Output(); err == nil {
+		rawLines := strings.Split(string(output), "\n")
+		var lines []string
+		for _, line := range rawLines {
+			lines = append(lines, line)
+		}
+		for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+			lines = lines[:len(lines)-1]
+		}
+
+		fmt.Fprintf(w, "\nLast %d lines (captured from tmux pane):\n", count)
+		fmt.Fprintln(w, "------------")
+		start := len(lines) - count
+		if start < 0 {
+			start = 0
+		}
+		for i := start; i < len(lines); i++ {
+			fmt.Fprintln(w, color.Colorize(lines[i], color.Cyan))
+		}
+		return
+	}
+
+	// 2. Fall back to transcript file
 	transcriptPath := filepath.Join(homeDir, ".gemini/antigravity-cli/brain", sessionID, ".system_generated/logs/transcript.jsonl")
 	var data []byte
 	var err error
@@ -178,30 +205,6 @@ func printLastTranscriptLines(w io.Writer, fs FileSystem, homeDir, sessionID str
 	}
 
 	if len(data) == 0 {
-		// Fallback to tmux pane capture
-		cmd := exec.Command("tmux", "capture-pane", "-p", "-t", sessionID)
-		if output, err := cmd.Output(); err == nil {
-			rawLines := strings.Split(string(output), "\n")
-			var lines []string
-			for _, line := range rawLines {
-				lines = append(lines, line)
-			}
-			for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
-				lines = lines[:len(lines)-1]
-			}
-
-			fmt.Fprintf(w, "\nLast %d lines (captured from tmux pane):\n", count)
-			fmt.Fprintln(w, "------------")
-			start := len(lines) - count
-			if start < 0 {
-				start = 0
-			}
-			for i := start; i < len(lines); i++ {
-				fmt.Fprintln(w, lines[i])
-			}
-			return
-		}
-
 		fmt.Fprintf(w, "\nLast %d lines:\n", count)
 		fmt.Fprintln(w, "------------")
 		fmt.Fprintln(w, "(no transcript logs found for this session)")

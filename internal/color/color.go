@@ -20,6 +20,7 @@ const (
 	Blue      = "\033[00;94m" // Light blue is cleaner on dark terminals
 	LightGray = "\033[00;37m"
 	DarkGray  = "\033[00;90m"
+	Cyan      = "\033[00;36m"
 	Plain     = "\033[00;00m" // Dummy style to preserve alignment for uncolored cells
 	Reset     = "\033[0m"
 )

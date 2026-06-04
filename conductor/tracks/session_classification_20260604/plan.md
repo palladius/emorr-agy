@@ -17,7 +17,7 @@
 - [x] Task 3.3: Implement the `--classify` / `--llm` flag logic with caching (JSON cache file) and locking (PID lockfile under `~/.emorr-agy/locks/`). (c25ccc5)
 - [x] Task 3.4: Conductor - User Manual Verification 'Phase 3: Sessions Show & LLM Classification' (Protocol in workflow.md) (f1725eb)
 
-## Phase 4: CLI Integration & Validation
-- [~] Task 4.1: Integrate `sessions` subcommand into root `main.go` using a clean CLI structure.
-- [ ] Task 4.2: Verify compile parity (`just build`), run all unit tests, ensure >80% code coverage.
-- [ ] Task 4.3: Conductor - User Manual Verification 'Phase 4: CLI Integration & Validation' (Protocol in workflow.md)
+## Phase 4: CLI Integration & Validation [checkpoint: cadec25]
+- [x] Task 4.1: Integrate `sessions` subcommand into root `main.go` using a clean CLI structure. (cadec25)
+- [x] Task 4.2: Verify compile parity (`just build`), run all unit tests, ensure >80% code coverage. (cadec25)
+- [x] Task 4.3: Conductor - User Manual Verification 'Phase 4: CLI Integration & Validation' (Protocol in workflow.md) (cadec25)

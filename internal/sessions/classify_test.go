@@ -1,7 +1,6 @@
 package sessions
 
 import (
-	"errors"
 	"io/fs"
 	"os"
 	"testing"

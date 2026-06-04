@@ -70,6 +70,8 @@ func ShowSession(w io.Writer, engine *ClassificationEngine, sessionID string, op
 	fmt.Fprintf(w, "PROCESS/WINDOW: %d\n", target.ProcessCount)
 	fmt.Fprintf(w, "RESUME CMD:     %s\n", target.ResumeCommand)
 
+	printLastTranscriptLines(w, engine.fs, engine.homeDir, target.ID, DefaultLastLinesCount)
+
 	if !opts.Classify {
 		return nil
 	}
@@ -136,4 +138,76 @@ func ShowSession(w io.Writer, engine *ClassificationEngine, sessionID string, op
 	fmt.Fprintf(w, "Worth Resuscitating: %t\n", result.WorthResuscitate)
 
 	return nil
+}
+
+func printLastTranscriptLines(w io.Writer, fs FileSystem, homeDir, sessionID string, count int) {
+	transcriptPath := filepath.Join(homeDir, ".gemini/antigravity-cli/brain", sessionID, ".system_generated/logs/transcript.jsonl")
+	var data []byte
+	var err error
+	if _, statErr := fs.Stat(transcriptPath); statErr == nil {
+		data, err = fs.ReadFile(transcriptPath)
+	} else {
+		transcriptPath = filepath.Join(homeDir, ".gemini/antigravity-cli/brain", sessionID, ".system_generated/logs/transcript_full.jsonl")
+		if _, statErr := fs.Stat(transcriptPath); statErr == nil {
+			data, err = fs.ReadFile(transcriptPath)
+		} else {
+			fmt.Fprintf(w, "\nLast %d lines:\n", count)
+			fmt.Fprintln(w, "------------")
+			fmt.Fprintln(w, "(no transcript logs found for this session)")
+			return
+		}
+	}
+
+	if err != nil {
+		fmt.Fprintf(w, "\nLast %d lines:\n", count)
+		fmt.Fprintln(w, "------------")
+		fmt.Fprintf(w, "(failed to read transcript: %v)\n", err)
+		return
+	}
+
+	// Split lines
+	rawLines := strings.Split(string(data), "\n")
+	// Clean up empty trailing line if present
+	if len(rawLines) > 0 && rawLines[len(rawLines)-1] == "" {
+		rawLines = rawLines[:len(rawLines)-1]
+	}
+
+	// Get last N lines
+	if len(rawLines) > count {
+		rawLines = rawLines[len(rawLines)-count:]
+	}
+
+	fmt.Fprintf(w, "\nLast %d lines:\n", count)
+	fmt.Fprintln(w, "------------")
+
+	if len(rawLines) == 0 {
+		fmt.Fprintln(w, "(transcript is empty)")
+		return
+	}
+
+	for _, line := range rawLines {
+		fmt.Fprintln(w, formatTranscriptLine(line))
+	}
+}
+
+func formatTranscriptLine(raw string) string {
+	var line struct {
+		Source  string `json:"source"`
+		Type    string `json:"type"`
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal([]byte(raw), &line); err != nil {
+		return raw
+	}
+	content := strings.TrimSpace(line.Content)
+	if len(content) > 150 {
+		content = content[:147] + "..."
+	}
+	// Sanitize newlines and multiple spaces
+	content = strings.ReplaceAll(content, "\n", " ")
+	content = strings.ReplaceAll(content, "\r", "")
+	content = strings.ReplaceAll(content, "\t", " ")
+	content = strings.Join(strings.Fields(content), " ")
+
+	return fmt.Sprintf("[%s:%s] %s", line.Source, line.Type, content)
 }

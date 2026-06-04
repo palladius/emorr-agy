@@ -155,3 +155,49 @@ func TestShowSessionLockingAndCaching(t *testing.T) {
 		}
 	})
 }
+
+func TestShowSessionWithTranscript(t *testing.T) {
+	sessionID := "emagy-session-789"
+	homeDir := "/home/ricc"
+	transcriptPath := filepath.Join(homeDir, ".gemini/antigravity-cli/brain", sessionID, ".system_generated/logs/transcript.jsonl")
+
+	mockTmux := &MockTmuxRunner{
+		sessions: []TmuxSession{
+			{Name: sessionID, Path: "/workspace/proj", Attached: true, Windows: 2},
+		},
+	}
+	
+	// Create mock transcript lines
+	line1 := `{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","content":"Running task details"}`
+	line2 := `{"step_index":2,"source":"MODEL","type":"RUN_COMMAND","content":"Building binaries\nLine 2"}`
+	transcriptData := line1 + "\n" + line2 + "\n"
+
+	mockFS := &MockFileSystem{
+		files: map[string][]byte{
+			transcriptPath: []byte(transcriptData),
+		},
+		stats: map[string]os.FileInfo{
+			transcriptPath: MockFileInfo{name: filepath.Base(transcriptPath), isDir: false},
+		},
+	}
+
+	engine := NewClassificationEngine(mockTmux, mockFS, homeDir)
+
+	var buf bytes.Buffer
+	err := ShowSession(&buf, engine, sessionID, ShowOptions{}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Last 5 lines:") {
+		t.Error("expected output to contain 'Last 5 lines:'")
+	}
+	if !strings.Contains(output, "[MODEL:PLANNER_RESPONSE] Running task details") {
+		t.Errorf("missing formatted planner response in output: %q", output)
+	}
+	if !strings.Contains(output, "[MODEL:RUN_COMMAND] Building binaries Line 2") {
+		t.Errorf("missing formatted command output in output: %q", output)
+	}
+}
+

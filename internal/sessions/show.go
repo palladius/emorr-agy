@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -151,11 +152,60 @@ func printLastTranscriptLines(w io.Writer, fs FileSystem, homeDir, sessionID str
 		if _, statErr := fs.Stat(transcriptPath); statErr == nil {
 			data, err = fs.ReadFile(transcriptPath)
 		} else {
-			fmt.Fprintf(w, "\nLast %d lines:\n", count)
+			// Try with trimmed prefix too
+			trimmedID := sessionID
+			if idx := strings.Index(sessionID, "-"); idx != -1 {
+				if strings.HasPrefix(sessionID, "emagy-") {
+					trimmedID = strings.TrimPrefix(sessionID, "emagy-")
+				} else if strings.HasPrefix(sessionID, "emgem-") {
+					trimmedID = strings.TrimPrefix(sessionID, "emgem-")
+				} else if strings.HasPrefix(sessionID, "emcld-") {
+					trimmedID = strings.TrimPrefix(sessionID, "emcld-")
+				}
+			}
+			if trimmedID != sessionID {
+				transcriptPath = filepath.Join(homeDir, ".gemini/antigravity-cli/brain", trimmedID, ".system_generated/logs/transcript.jsonl")
+				if _, statErr := fs.Stat(transcriptPath); statErr == nil {
+					data, err = fs.ReadFile(transcriptPath)
+				} else {
+					transcriptPath = filepath.Join(homeDir, ".gemini/antigravity-cli/brain", trimmedID, ".system_generated/logs/transcript_full.jsonl")
+					if _, statErr := fs.Stat(transcriptPath); statErr == nil {
+						data, err = fs.ReadFile(transcriptPath)
+					}
+				}
+			}
+		}
+	}
+
+	if len(data) == 0 {
+		// Fallback to tmux pane capture
+		cmd := exec.Command("tmux", "capture-pane", "-p", "-t", sessionID)
+		if output, err := cmd.Output(); err == nil {
+			rawLines := strings.Split(string(output), "\n")
+			var lines []string
+			for _, line := range rawLines {
+				lines = append(lines, line)
+			}
+			for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+				lines = lines[:len(lines)-1]
+			}
+
+			fmt.Fprintf(w, "\nLast %d lines (captured from tmux pane):\n", count)
 			fmt.Fprintln(w, "------------")
-			fmt.Fprintln(w, "(no transcript logs found for this session)")
+			start := len(lines) - count
+			if start < 0 {
+				start = 0
+			}
+			for i := start; i < len(lines); i++ {
+				fmt.Fprintln(w, lines[i])
+			}
 			return
 		}
+
+		fmt.Fprintf(w, "\nLast %d lines:\n", count)
+		fmt.Fprintln(w, "------------")
+		fmt.Fprintln(w, "(no transcript logs found for this session)")
+		return
 	}
 
 	if err != nil {

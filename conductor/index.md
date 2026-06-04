@@ -27,6 +27,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 - [telegram_audio_messages_20260604](tracks/telegram_audio_messages_20260604/index.md) (completed)
 - [audio_transcription_model_fix_20260604](tracks/audio_transcription_model_fix_20260604/index.md) (completed)
 - [shell_autocompletion_20260604](tracks/shell_autocompletion_20260604/index.md) (planned)
+- [telegram_server_interactive_commands_20260604](tracks/telegram_server_interactive_commands_20260604/index.md) (planned)
 
 ## References
 - [Product Guide](product.md)
@@ -73,4 +74,9 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 - [ ] **Track: Shell autocompletion for emorr-agy subcommands and dynamic session IDs in Bash/Zsh.**
 *Link: [./tracks/shell_autocompletion_20260604/](./tracks/shell_autocompletion_20260604/)*
+
+---
+
+- [ ] **Track: Telegram Server interactive commands /list and /listall for session response handling.**
+*Link: [./tracks/telegram_server_interactive_commands_20260604/](./tracks/telegram_server_interactive_commands_20260604/)*
 

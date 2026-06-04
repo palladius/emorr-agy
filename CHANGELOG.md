@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplified thread monitor states to clean text tags (`TOOL`, `USER`, `CLOSED`, `WRITING`) for perfect tabular alignment.
 - Corrected TMUX emoji padding to prevent tabwriter column shifts.
 - Switched default Gemini model to `gemini-3.1-flash-lite` to resolve v1beta 404 errors, with support for overrides via `AUDIO_TRANSCRIPTION_GEMINI_MODEL` and `GEMINI_MODEL` env vars.
+- Switched the harness emoji for `agy` from an apple (🍏) to a balloon (🎈) to represent floating/air.
 
 ## [0.1.1] - 2026-06-04
 

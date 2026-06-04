@@ -17,8 +17,8 @@ E. Morricone Ag (emorr-agy) is a Go-based Telegram bot and CLI orchestrator to m
 - [000_initial_setup](tracks/000_initial_setup/index.md) (planned)
 - [agy_monitor_20260602](tracks/agy_monitor_20260602/index.md) (completed)
 - [telegram_channel_assets_20260602](tracks/telegram_channel_assets_20260602/index.md) (planned)
-- [multiple_harnesses_20260604](tracks/multiple_harnesses_20260604/index.md) (new)
 - [logging_20260604](tracks/logging_20260604/index.md) (planned)
+- [rogue_session_cleanup_20260604](tracks/rogue_session_cleanup_20260604/index.md) (planned)
 
 ## References
 - [Product Guide](product.md)
@@ -28,10 +28,10 @@ E. Morricone Ag (emorr-agy) is a Go-based Telegram bot and CLI orchestrator to m
 
 ---
 
-- [ ] **Track: Support multiple harnesses (Gemini CLI and Claude Code)**
-*Link: [./tracks/multiple_harnesses_20260604/](./tracks/multiple_harnesses_20260604/)*
+- [ ] **Track: Implement Logging**
+*Link: [./tracks/logging_20260604/](./tracks/logging_20260604/)*
 
 ---
 
-- [ ] **Track: Implement Logging**
-*Link: [./tracks/logging_20260604/](./tracks/logging_20260604/)*
+- [ ] **Track: Sync and Cleanup Rogue Session Changes**
+*Link: [./tracks/rogue_session_cleanup_20260604/](./tracks/rogue_session_cleanup_20260604/)*

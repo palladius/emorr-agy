@@ -115,7 +115,7 @@ func TestShowSessionLockingAndCaching(t *testing.T) {
 		}
 
 		output := buf.String()
-		if !strings.Contains(output, "Debugging tests") || !strings.Contains(output, "User Input Pending: true") {
+		if !strings.Contains(output, "Debugging tests") || !strings.Contains(output, "User Input Pending:  true") {
 			t.Errorf("missing cached classification details: %q", output)
 		}
 		if mockClassifier.called {

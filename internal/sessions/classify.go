@@ -45,7 +45,22 @@ type FileSystem interface {
 	ReadFile(filename string) ([]byte, error)
 	Readlink(name string) (string, error)
 	Stat(name string) (os.FileInfo, error)
+	WriteFile(filename string, data []byte, perm os.FileMode) error
+	MkdirAll(path string, perm os.FileMode) error
+	Remove(name string) error
 }
+
+type OSFileSystem struct{}
+
+func (OSFileSystem) ReadDir(dirname string) ([]os.DirEntry, error) { return os.ReadDir(dirname) }
+func (OSFileSystem) ReadFile(filename string) ([]byte, error)     { return os.ReadFile(filename) }
+func (OSFileSystem) Readlink(name string) (string, error)         { return os.Readlink(name) }
+func (OSFileSystem) Stat(name string) (os.FileInfo, error)        { return os.Stat(name) }
+func (OSFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) error {
+	return os.WriteFile(filename, data, perm)
+}
+func (OSFileSystem) MkdirAll(path string, perm os.FileMode) error { return os.MkdirAll(path, perm) }
+func (OSFileSystem) Remove(name string) error                     { return os.Remove(name) }
 
 type ClassificationEngine struct {
 	tmux    TmuxRunner

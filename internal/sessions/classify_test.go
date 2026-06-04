@@ -3,6 +3,7 @@ package sessions
 import (
 	"io/fs"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -75,6 +76,32 @@ func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
 		return info, nil
 	}
 	return nil, os.ErrNotExist
+}
+
+func (m *MockFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) error {
+	if m.files == nil {
+		m.files = make(map[string][]byte)
+	}
+	m.files[filename] = data
+	if m.stats == nil {
+		m.stats = make(map[string]os.FileInfo)
+	}
+	m.stats[filename] = MockFileInfo{name: filepath.Base(filename), isDir: false}
+	return nil
+}
+
+func (m *MockFileSystem) MkdirAll(path string, perm os.FileMode) error {
+	return nil
+}
+
+func (m *MockFileSystem) Remove(name string) error {
+	if m.files != nil {
+		delete(m.files, name)
+	}
+	if m.stats != nil {
+		delete(m.stats, name)
+	}
+	return nil
 }
 
 func TestClassifySessions(t *testing.T) {

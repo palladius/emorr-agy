@@ -384,6 +384,10 @@ func sendStartupNotification() {
 	}
 }
 
+func shouldSendNotification(command string) bool {
+	return command == "server"
+}
+
 func runStatus() error {
 	hostname, err := os.Hostname()
 	if err != nil {

@@ -8,8 +8,8 @@
 
 ## Phase 2: Sessions List Subcommand
 - [x] Task 2.1: Write unit tests for `sessions list` command outputs, formats (`--short`, `--long`, `--json`), and filtering by `--harness`. (4c33b77)
-- [~] Task 2.2: Implement `sessions list` command integration in `internal/sessions/list.go` with tabular output styling, emojis, and JSON format option.
-- [ ] Task 2.3: Conductor - User Manual Verification 'Phase 2: Sessions List Subcommand' (Protocol in workflow.md)
+- [x] Task 2.2: Implement `sessions list` command integration in `internal/sessions/list.go` with tabular output styling, emojis, and JSON format option. (b650673)
+- [~] Task 2.3: Conductor - User Manual Verification 'Phase 2: Sessions List Subcommand' (Protocol in workflow.md)
 
 ## Phase 3: Sessions Show & LLM Classification
 - [ ] Task 3.1: Write unit tests verifying `sessions show` command, file locking (PID locking), and LLM classification caching.

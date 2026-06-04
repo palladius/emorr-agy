@@ -43,7 +43,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		fmt.Fprintln(tw, "STATUS\tSESSION ID\tAGE\tDIRECTORY\tHARNESS\tWINDOWS\tRESUME COMMAND")
 		for _, s := range sessions {
 			emoji := getEmojiForState(s.State)
-			age := formatAge(s.LastActivity)
+			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%d\t%s\n", emoji, s.ID, age, folder, s.Harness, s.ProcessCount, s.ResumeCommand)
 		}
@@ -54,7 +54,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		fmt.Fprintln(tw, "STATUS\tSESSION ID\tAGE\tDIRECTORY")
 		for _, s := range sessions {
 			emoji := getEmojiForState(s.State)
-			age := formatAge(s.LastActivity)
+			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", emoji, s.ID, age, folder)
 		}
@@ -81,7 +81,7 @@ func getEmojiForState(state SessionState) string {
 	}
 }
 
-func formatAge(t time.Time) string {
+func FormatAge(t time.Time) string {
 	if t.IsZero() {
 		return "n/a"
 	}

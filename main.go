@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -213,10 +214,11 @@ func cleanValue(s string) string {
 // --- Monitor Subcommand Logic ---
 
 type ThreadInfo struct {
-	ConvID string
-	Dir    string
-	IsOpen bool
-	PID    int
+	ConvID       string
+	Dir          string
+	IsOpen       bool
+	PID          int
+	LastActivity time.Time
 }
 
 func runMonitor() error {
@@ -252,10 +254,20 @@ func runMonitor() error {
 
 	// Add historical ones
 	for dir, convID := range cacheConvs {
+		dbPath := filepath.Join(cliPath, "conversations", convID+".db")
+		var lastActivity time.Time
+		if fi, err := os.Stat(dbPath); err == nil {
+			lastActivity = fi.ModTime()
+		} else {
+			if fi, err := os.Stat(dir); err == nil {
+				lastActivity = fi.ModTime()
+			}
+		}
 		merged[convID] = &ThreadInfo{
-			ConvID: convID,
-			Dir:    dir,
-			IsOpen: false,
+			ConvID:       convID,
+			Dir:          dir,
+			IsOpen:       false,
+			LastActivity: lastActivity,
 		}
 	}
 
@@ -267,29 +279,43 @@ func runMonitor() error {
 			dir = "unknown (exited)"
 		}
 
+		dbPath := filepath.Join(cliPath, "conversations", convID+".db")
+		var lastActivity time.Time
+		if fi, err := os.Stat(dbPath); err == nil {
+			lastActivity = fi.ModTime()
+		} else {
+			if fi, err := os.Stat(dir); err == nil {
+				lastActivity = fi.ModTime()
+			}
+		}
+
 		merged[convID] = &ThreadInfo{
-			ConvID: convID,
-			Dir:    dir,
-			IsOpen: true,
-			PID:    pid,
+			ConvID:       convID,
+			Dir:          dir,
+			IsOpen:       true,
+			PID:          pid,
+			LastActivity: lastActivity,
 		}
 	}
 
-	// Sort by status (Open first) and then directory
+	// Sort by last activity mod time descending
 	var threads []*ThreadInfo
 	for _, thread := range merged {
 		threads = append(threads, thread)
 	}
 	sort.Slice(threads, func(i, j int) bool {
-		if threads[i].IsOpen != threads[j].IsOpen {
-			return threads[i].IsOpen // true (Open) comes first
+		if threads[i].LastActivity.Equal(threads[j].LastActivity) {
+			return threads[i].ConvID < threads[j].ConvID
 		}
-		return threads[i].Dir < threads[j].Dir
+		return threads[i].LastActivity.After(threads[j].LastActivity)
 	})
 
-	// 5. Output the status list
+	// 5. Output the status list in tabular way
 	fmt.Println("📡 Antigravity (agy) Thread Monitor:")
 	fmt.Println("--------------------------------------------------------------------------------")
+
+	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "STATUS\tSESSION ID\tAGE\tSTATE\tDIRECTORY")
 
 	for _, thread := range threads {
 		shortID := thread.ConvID
@@ -298,37 +324,35 @@ func runMonitor() error {
 		}
 
 		folder := strings.ReplaceAll(thread.Dir, "/usr/local/google/home/ricc", "~")
+		age := sessions.FormatAge(thread.LastActivity)
 
 		if !thread.IsOpen {
-			fmt.Printf("⚫ %s - %s [Closed]\n", shortID, folder)
+			fmt.Fprintf(tw, "⚫\t%s\t%s\tCLOSED\t%s\n", shortID, age, folder)
 			continue
 		}
 
 		// Conversation is open (🟢), now infer detailed state
 		dbPath := filepath.Join(cliPath, "conversations", thread.ConvID+".db")
-		stateEmoji := "✍️"
-		stateDetail := "Gemini Writing"
+		stateDetail := "WRITING"
 
 		// A. Check for child processes (Tool Calling/IO)
 		if children := processTree[thread.PID]; len(children) > 0 {
-			stateEmoji = "🛠️"
-			stateDetail = "Tool Calling / IO"
+			stateDetail = "TOOL"
 		} else {
 			// B. Check SQLite DB for latest step status
 			stepType, status, err := getLatestStep(dbPath)
 			if err == nil {
 				if status == 3 { // Done
-					stateEmoji = "💬"
-					stateDetail = "Waiting on User"
+					stateDetail = "USER"
 				} else if stepType > 0 { // Any tool step type in progress
-					stateEmoji = "🛠️"
-					stateDetail = "Running Tool"
+					stateDetail = "TOOL"
 				}
 			}
 		}
 
-		fmt.Printf("🟢 %s - %s [%s %s]\n", shortID, folder, stateDetail, stateEmoji)
+		fmt.Fprintf(tw, "🟢\t%s\t%s\t%s\t%s\n", shortID, age, stateDetail, folder)
 	}
+	tw.Flush()
 
 	return nil
 }

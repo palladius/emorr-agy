@@ -38,5 +38,21 @@ show-logs limit="10":
 		echo "Error: Could not resolve GCP project ID. Set PROJECT_ID or configure .env" >&2
 		exit 1
 	fi
+
+	IDENTITY="${GCLOUD_IDENTITY:-}"
+	if [ -z "$IDENTITY" ] && [ -f .env ]; then
+		IDENTITY=$(grep -E '^GCLOUD_IDENTITY=' .env | head -n1 | cut -d= -f2 | tr -d "'\"" | xargs)
+	fi
+
+	EXTRA_FLAGS=()
+	if [ -n "$IDENTITY" ]; then
+		EXTRA_FLAGS+=("--account=${IDENTITY}" "--impersonate-service-account=")
+	fi
+
 	echo "Reading latest {{limit}} logs from Cloud Logging for project '${PROJ}'..."
-	gcloud logging read "logName=projects/${PROJ}/logs/emorr-agy-server" --limit={{limit}} --project="${PROJ}" --format="table(timestamp, severity, jsonPayload.message)"
+	gcloud logging read "logName=projects/${PROJ}/logs/emorr-agy-server" \
+		--limit={{limit}} \
+		--project="${PROJ}" \
+		"${EXTRA_FLAGS[@]}" \
+		--format="table(timestamp, severity, jsonPayload.message)"
+

@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Display of the last 5 transcript lines in `sessions show` command (configurable via `DefaultLastLinesCount`).
 - Printed application version on server startup stdout.
 - Added `just version` recipe to display the current application version.
-- Added `just show-logs` recipe to fetch the latest N logs from Cloud Logging for the resolved project.
+- Added `just show-logs` recipe to fetch the latest N logs from Cloud Logging for the resolved project (with support for `GCLOUD_IDENTITY` and auto-bypassing active service account impersonation).
 
 ### Changed
 - Formatted `emorr-agy monitor` output as a clean table with AGE, STATE, and right-aligned DIRECTORY.

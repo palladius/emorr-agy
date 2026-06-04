@@ -20,7 +20,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 - [agy_monitor_20260602](tracks/agy_monitor_20260602/index.md) (completed)
 - [telegram_channel_assets_20260602](tracks/telegram_channel_assets_20260602/index.md) (planned)
 - [logging_20260604](tracks/logging_20260604/index.md) (planned)
-- [rogue_session_cleanup_20260604](tracks/rogue_session_cleanup_20260604/index.md) (planned)
+- [rogue_session_cleanup_20260604](tracks/rogue_session_cleanup_20260604/index.md) (completed)
 - [harness_discovery_20260604](tracks/harness_discovery_20260604/index.md) (planned)
 - [codebase_modularization_20260604](tracks/codebase_modularization_20260604/index.md) (planned)
 
@@ -37,7 +37,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 ---
 
-- [ ] **Track: Sync and Cleanup Rogue Session Changes**
+- [x] **Track: Sync and Cleanup Rogue Session Changes**
 *Link: [./tracks/rogue_session_cleanup_20260604/](./tracks/rogue_session_cleanup_20260604/)*
 
 ---

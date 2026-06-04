@@ -1,8 +1,8 @@
 {
   "track_id": "rogue_session_cleanup_20260604",
   "type": "chore",
-  "status": "new",
+  "status": "completed",
   "created_at": "2026-06-04T10:10:00Z",
-  "updated_at": "2026-06-04T10:10:00Z",
+  "updated_at": "2026-06-04T10:47:00Z",
   "description": "Sync, verify, and document changes from the rogue session SESSION-1285437-LAST_WISHES.md."
 }

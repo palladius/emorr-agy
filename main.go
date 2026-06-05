@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -721,7 +722,7 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 		if err != nil {
 			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error getting status: %v", err))
 		} else {
-			_ = telegram.SendTelegramMessageToChat(botToken, chatID, statusOutput)
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("```\n%s\n```", statusOutput))
 		}
 
 	case strings.HasPrefix(text, "/monitor") || text == "monitor":
@@ -729,7 +730,7 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 		if err != nil {
 			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error getting monitor: %v", err))
 		} else {
-			_ = telegram.SendTelegramMessageToChat(botToken, chatID, monitorOutput)
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("```\n%s\n```", monitorOutput))
 		}
 
 	case strings.HasPrefix(text, "/listall") || text == "listall":
@@ -749,8 +750,17 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 			limit = len(allSessions)
 		}
 		selected := allSessions[:limit]
+
+		// Format the table of all sessions (including archived)
+		os.Setenv("NO_COLOR", "1")
+		var buf bytes.Buffer
+		_ = sessions.ListSessions(&buf, engine, sessions.ListOptions{Format: "short", All: true})
+		os.Unsetenv("NO_COLOR")
+		tableStr := buf.String()
+
 		if len(selected) == 0 {
-			_ = telegram.SendTelegramMessageToChat(botToken, chatID, "No sessions found.")
+			msg := fmt.Sprintf("📁 *All Sessions:*\n```\n%s\n```\nNo sessions found.", tableStr)
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, msg)
 			return nil
 		}
 		var btnInfos []telegram.SessionButton
@@ -765,7 +775,8 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error building keyboard: %v", err))
 			return err
 		}
-		err = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "📁 *Last 5 Sessions:*", markup)
+		msg := fmt.Sprintf("📁 *Last 5 Sessions:*\n```\n%s\n```", tableStr)
+		err = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, msg, markup)
 		if err != nil {
 			logger.Errorf("Failed to send sessions list: %v", err)
 		}
@@ -810,8 +821,17 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 			limit = len(filtered)
 		}
 		selected := filtered[:limit]
+
+		// Format the table of active sessions (excluding archived)
+		os.Setenv("NO_COLOR", "1")
+		var buf bytes.Buffer
+		_ = sessions.ListSessions(&buf, engine, sessions.ListOptions{Format: "short", All: false})
+		os.Unsetenv("NO_COLOR")
+		tableStr := buf.String()
+
 		if len(selected) == 0 {
-			_ = telegram.SendTelegramMessageToChat(botToken, chatID, "No sessions are currently waiting on human interaction.")
+			msg := fmt.Sprintf("💬 *Active Sessions:*\n```\n%s\n```\nNo sessions are currently waiting on human interaction.", tableStr)
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, msg)
 			return nil
 		}
 		var btnInfos []telegram.SessionButton
@@ -826,7 +846,8 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error building keyboard: %v", err))
 			return err
 		}
-		err = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "💬 *Sessions Pending Human Interaction:*", markup)
+		msg := fmt.Sprintf("💬 *Sessions Pending Human Interaction:*\n```\n%s\n```", tableStr)
+		err = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, msg, markup)
 		if err != nil {
 			logger.Errorf("Failed to send human-pending list: %v", err)
 		}
@@ -843,6 +864,19 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 	case strings.HasPrefix(text, "/restart") || text == "restart":
 		_ = telegram.SendTelegramMessageToChat(botToken, chatID, "🔄 *Restarting the emorr-agy server...*")
 		restartServer()
+
+	case strings.ToLower(text) == "ping" || text == "/ping":
+		_ = telegram.SendTelegramMessageToChat(botToken, chatID, "🏓 Pong!")
+
+	default:
+		// Unknown text/command
+		helpMsg := "❌ *Command not recognized.*\n\n📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads\n• `/list` - Show active sessions waiting on user interaction\n• `/listall` - Show the last 5 sessions of any state\n• `/restart` - Restart the background bot server"
+		markup, err := telegram.BuildMenuKeyboard()
+		if err == nil {
+			_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, helpMsg, markup)
+		} else {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, helpMsg)
+		}
 	}
 
 	return nil
@@ -925,8 +959,17 @@ func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) er
 				limit = len(filtered)
 			}
 			selected := filtered[:limit]
+
+			// Format the table of active sessions (excluding archived)
+			os.Setenv("NO_COLOR", "1")
+			var buf bytes.Buffer
+			_ = sessions.ListSessions(&buf, engine, sessions.ListOptions{Format: "short", All: false})
+			os.Unsetenv("NO_COLOR")
+			tableStr := buf.String()
+
 			if len(selected) == 0 {
-				_ = telegram.SendTelegramMessageToChat(botToken, chatID, "No sessions are currently waiting on human interaction.")
+				msg := fmt.Sprintf("💬 *Active Sessions:*\n```\n%s\n```\nNo sessions are currently waiting on human interaction.", tableStr)
+				_ = telegram.SendTelegramMessageToChat(botToken, chatID, msg)
 				return nil
 			}
 			var btnInfos []telegram.SessionButton
@@ -941,7 +984,8 @@ func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) er
 				_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error building keyboard: %v", err))
 				return err
 			}
-			_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "💬 *Sessions Pending Human Interaction:*", markup)
+			msg := fmt.Sprintf("💬 *Sessions Pending Human Interaction:*\n```\n%s\n```", tableStr)
+			_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, msg, markup)
 
 		case "list_all":
 			allSessions, err := engine.Classify(nil)
@@ -954,8 +998,17 @@ func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) er
 				limit = len(allSessions)
 			}
 			selected := allSessions[:limit]
+
+			// Format the table of all sessions (including archived)
+			os.Setenv("NO_COLOR", "1")
+			var buf bytes.Buffer
+			_ = sessions.ListSessions(&buf, engine, sessions.ListOptions{Format: "short", All: true})
+			os.Unsetenv("NO_COLOR")
+			tableStr := buf.String()
+
 			if len(selected) == 0 {
-				_ = telegram.SendTelegramMessageToChat(botToken, chatID, "No sessions found.")
+				msg := fmt.Sprintf("📁 *All Sessions:*\n```\n%s\n```\nNo sessions found.", tableStr)
+				_ = telegram.SendTelegramMessageToChat(botToken, chatID, msg)
 				return nil
 			}
 			var btnInfos []telegram.SessionButton
@@ -970,7 +1023,8 @@ func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) er
 				_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error building keyboard: %v", err))
 				return err
 			}
-			_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "📁 *Last 5 Sessions:*", markup)
+			msg := fmt.Sprintf("📁 *Last 5 Sessions:*\n```\n%s\n```", tableStr)
+			_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, msg, markup)
 
 		case "restart_server":
 			_ = telegram.SendTelegramMessageToChat(botToken, chatID, "🔄 *Restarting the emorr-agy server...*")
@@ -1103,6 +1157,7 @@ func getStatusOutput() (string, error) {
 		return "", err
 	}
 	cmd := exec.Command(exe, "status")
+	cmd.Env = append(os.Environ(), "NO_COLOR=1")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -1116,6 +1171,7 @@ func getMonitorOutput() (string, error) {
 		return "", err
 	}
 	cmd := exec.Command(exe, "monitor")
+	cmd.Env = append(os.Environ(), "NO_COLOR=1")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err

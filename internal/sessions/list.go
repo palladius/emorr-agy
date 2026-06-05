@@ -161,7 +161,7 @@ func getEmojiForHarness(harness string) string {
 	case "gemini":
 		return "♊"
 	case "agy":
-		return "🎈"
+		return "⬆"
 	case "claude":
 		return "🇫🇷"
 	default:

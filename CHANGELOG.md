@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Filtered out archived sessions (`⚫`) from the default list to keep it clean.
 - Added `-a` / `--all` flags to include archived sessions in the list output, positioned at the bottom of the list under a visual dashed divider.
 - Added a fallback that automatically extracts and cleans the first user input/request from the session's `transcript.jsonl` log when no LLM classification cache is available.
+- Shortened session list column headers (STATUS -> ST, TYPE -> T, DIRECTORY -> DIR) and capped directory paths to a maximum of 15 characters for a more compact tabular CLI layout.
 
 ## [0.1.2] - 2026-06-04
 

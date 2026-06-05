@@ -55,11 +55,11 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 	case "long":
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			color.Colorize("STATUS", color.Plain),
-			color.Colorize("TYPE", color.Plain),
+			color.Colorize("ST", color.Plain),
+			color.Colorize("T", color.Plain),
 			color.Colorize("SESSION ID", color.Plain),
 			color.Colorize("AGE", color.Plain),
-			color.Colorize("DIRECTORY", color.Plain),
+			color.Colorize("DIR", color.Plain),
 			color.Colorize("HARNESS", color.Plain),
 			color.Colorize("WINDOWS", color.Plain),
 			color.Colorize("RESUME COMMAND", color.Plain),
@@ -75,6 +75,9 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			harnessEmoji := getEmojiForHarness(s.Harness)
 			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
+			if len(folder) > 15 {
+				folder = folder[:12] + "..."
+			}
 
 			ageColor := color.LightGray
 			if strings.Contains(age, "d") || age == "n/a" {
@@ -101,11 +104,11 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 	default: // "short" or fallback
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
-			color.Colorize("STATUS", color.Plain),
-			color.Colorize("TYPE", color.Plain),
+			color.Colorize("ST", color.Plain),
+			color.Colorize("T", color.Plain),
 			color.Colorize("SESSION ID", color.Plain),
 			color.Colorize("AGE", color.Plain),
-			color.Colorize("DIRECTORY", color.Plain),
+			color.Colorize("DIR", color.Plain),
 			color.Colorize("DESCRIPTION", color.Plain),
 		)
 		hasPrintedSeparator := false
@@ -118,6 +121,9 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			harnessEmoji := getEmojiForHarness(s.Harness)
 			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
+			if len(folder) > 15 {
+				folder = folder[:12] + "..."
+			}
 
 			ageColor := color.LightGray
 			if strings.Contains(age, "d") || age == "n/a" {

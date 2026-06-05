@@ -169,6 +169,9 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 					description = cacheRes.About
 				}
 			}
+			if description == "" {
+				description = c.getTranscriptDescription(id)
+			}
 
 			attachedClients := ts.AttachedClients
 			if attachedClients == 0 && ts.Attached {
@@ -218,6 +221,9 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 						worthResuscitate = cacheRes.WorthResuscitate
 						cachedAbout = cacheRes.About
 					}
+				}
+				if cachedAbout == "" {
+					cachedAbout = c.getTranscriptDescription(convID)
 				}
 
 				// If it's active in background processes but not in tmux, it's StateOpenAgy (emoji 🟢)
@@ -372,4 +378,55 @@ func (c *ClassificationEngine) isExcluded(id, folder string) bool {
 		}
 	}
 	return false
+}
+
+func (c *ClassificationEngine) getTranscriptDescription(sessionID string) string {
+	trimmedID := sessionID
+	if strings.HasPrefix(sessionID, "emagy-") {
+		trimmedID = strings.TrimPrefix(sessionID, "emagy-")
+	} else if strings.HasPrefix(sessionID, "emgem-") {
+		trimmedID = strings.TrimPrefix(sessionID, "emgem-")
+	} else if strings.HasPrefix(sessionID, "emcld-") {
+		trimmedID = strings.TrimPrefix(sessionID, "emcld-")
+	}
+
+	paths := []string{
+		filepath.Join(c.homeDir, ".gemini/antigravity-cli/brain", trimmedID, ".system_generated/logs/transcript.jsonl"),
+		filepath.Join(c.homeDir, ".gemini/antigravity-cli/brain", trimmedID, ".system_generated/logs/transcript_full.jsonl"),
+		filepath.Join(c.homeDir, ".gemini/antigravity-cli/brain", sessionID, ".system_generated/logs/transcript.jsonl"),
+		filepath.Join(c.homeDir, ".gemini/antigravity-cli/brain", sessionID, ".system_generated/logs/transcript_full.jsonl"),
+	}
+
+	for _, p := range paths {
+		data, err := c.fs.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		lines := strings.SplitN(string(data), "\n", 2)
+		if len(lines) == 0 || lines[0] == "" {
+			continue
+		}
+		var step struct {
+			Type    string `json:"type"`
+			Content string `json:"content"`
+		}
+		if err := json.Unmarshal([]byte(lines[0]), &step); err == nil {
+			if step.Type == "USER_INPUT" && step.Content != "" {
+				content := step.Content
+				if startIdx := strings.Index(content, "<USER_REQUEST>"); startIdx != -1 {
+					content = content[startIdx+len("<USER_REQUEST>"):]
+					if endIdx := strings.Index(content, "</USER_REQUEST>"); endIdx != -1 {
+						content = content[:endIdx]
+					}
+				}
+				content = strings.TrimSpace(content)
+				content = strings.ReplaceAll(content, "\n", " ")
+				if len(content) > 120 {
+					content = content[:117] + "..."
+				}
+				return content
+			}
+		}
+	}
+	return ""
 }

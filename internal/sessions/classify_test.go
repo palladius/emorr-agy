@@ -121,6 +121,7 @@ func TestClassifySessions(t *testing.T) {
 				"/workspace/proj4": "session-chumbawamba",
 				"/workspace/proj5": "session-active-but-dead"
 			}`),
+			"/home/ricc/.gemini/antigravity-cli/brain/session-active-but-dead/.system_generated/logs/transcript.jsonl": []byte(`{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","content":"<USER_REQUEST>\nImplement a new feature\n</USER_REQUEST>"}`),
 		},
 		dirs: map[string][]os.DirEntry{},
 	}
@@ -180,6 +181,9 @@ func TestClassifySessions(t *testing.T) {
 				foundActiveButDead = true
 				if s.State != StateDeadResuscitatable {
 					t.Errorf("expected session-active-but-dead to be dead_resuscitatable, got %s", s.State)
+				}
+				if s.Description != "Implement a new feature" {
+					t.Errorf("expected description to be 'Implement a new feature', got %q", s.Description)
 				}
 			}
 		}

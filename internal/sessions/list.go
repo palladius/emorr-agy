@@ -57,7 +57,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			color.Colorize("ST", color.Plain),
 			color.Colorize("T", color.Plain),
-			color.Colorize("SESSION ID", color.Plain),
+			color.Colorize("  SESSION ID", color.Plain),
 			color.Colorize("AGE", color.Plain),
 			color.Colorize("DIR", color.Plain),
 			color.Colorize("HARNESS", color.Plain),
@@ -86,8 +86,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 			desc := strings.TrimSpace(s.Description)
 			desc = strings.ReplaceAll(desc, "\n", " ")
-			if len(desc) > 30 {
-				desc = desc[:27] + "..."
+			if len(desc) > 50 {
+				desc = desc[:47] + "..."
 			}
 
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
@@ -109,7 +109,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			color.Colorize("ST", color.Plain),
 			color.Colorize("T", color.Plain),
-			color.Colorize("SESSION ID", color.Plain),
+			color.Colorize("  SESSION ID", color.Plain),
 			color.Colorize("AGE", color.Plain),
 			color.Colorize("DIR", color.Plain),
 			color.Colorize("DESCRIPTION", color.Plain),
@@ -135,8 +135,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 			desc := strings.TrimSpace(s.Description)
 			desc = strings.ReplaceAll(desc, "\n", " ")
-			if len(desc) > 30 {
-				desc = desc[:27] + "..."
+			if len(desc) > 50 {
+				desc = desc[:47] + "..."
 			}
 
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",

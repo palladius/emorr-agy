@@ -1,5 +1,5 @@
 [00;00mST T[0m [00;00m  SESSION ID[0m                         [00;00mAGE[0m [00;00mDIR[0m                       [00;00mDESCRIPTION[0m
-[00;00m🟢 ⬆[0m  [01;37mff02fea2-98ff-4ecb-8c08-5790af11ff9b[0m [00;32m 7s[0m [00;94m~/git/emorr-agy[0m           [00;36mThe agent is investigating and debugging format...[0m
+[00;00m🟢 ⬆[0m  [01;37mff02fea2-98ff-4ecb-8c08-5790af11ff9b[0m [00;32m<1m[0m [00;94m~/git/emorr-agy[0m           [00;36mThe agent is investigating and debugging format...[0m
 [00;00m💻 ⬆[0m  [01;37memagy-gic-codelab2[0m                   [00;37m 1h[0m [00;94m~/git/gic[0m                 [00;36m[0m
 [00;00m💤 ⬆[0m  [01;37m967b109d-5897-4b00-aeba-76c4442eedfd[0m [00;37m 1h[0m [00;94m~/git/sre[0m                 [00;36mis there an antrhoipic best practices on skills...[0m
 [00;00m💤 ⬆[0m  [01;37m1865afc6-5fc8-4f73-87f0-15d9d4125661[0m [00;37m 1h[0m [00;94m~/git/gic[0m                 [00;36mCiao come va?[0m

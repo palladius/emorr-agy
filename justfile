@@ -19,7 +19,7 @@ run-server-under-tmux: build
 	tmux new-session -d -s emorr-agy-server "./bin/emorr-agy server" || echo "Session 'emorr-agy-server' already exists. Use 'just attach-server' to view."
 
 attach-server:
-	tmux attach -t emorr-agy-server
+	tmux attach -t emorr-agy-server || echo if it doesnt work try first: just run-server-under-tmux
 
 version:
 	@cat VERSION

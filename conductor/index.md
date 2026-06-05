@@ -77,6 +77,6 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 ---
 
-- [ ] **Track: Telegram Server interactive commands /list and /listall for session response handling.**
+- [x] **Track: Telegram Server interactive commands /list and /listall for session response handling.**
 *Link: [./tracks/telegram_server_interactive_commands_20260604/](./tracks/telegram_server_interactive_commands_20260604/)*
 

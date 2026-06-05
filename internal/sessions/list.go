@@ -92,7 +92,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			}
 
 			statusAndHarness := fmt.Sprintf("%s %s", emoji, harnessEmoji)
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			fmt.Fprintf(tw, "%s\t %s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				color.Colorize(statusAndHarness, color.Plain),
 				color.Colorize(s.ID, color.BoldWhite),
 				color.Colorize(fmt.Sprintf("%3s", age), ageColor),
@@ -142,7 +142,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			}
 
 			statusAndHarness := fmt.Sprintf("%s %s", emoji, harnessEmoji)
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+			fmt.Fprintf(tw, "%s\t %s\t%s\t%s\t%s\n",
 				color.Colorize(statusAndHarness, color.Plain),
 				color.Colorize(s.ID, color.BoldWhite),
 				color.Colorize(fmt.Sprintf("%3s", age), ageColor),

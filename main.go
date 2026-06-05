@@ -525,11 +525,17 @@ func sendStartupNotification() {
 	}
 
 	markup, err := telegram.BuildReplyKeyboard()
+
+	lockStatus := ""
+	if !serverUnlocked && !isTestMode() {
+		lockStatus = "\n🔒 *Server is locked.* Please enter the PIN (`4242`) to unlock."
+	}
+
 	if err == nil && botToken != "" {
-		msg := fmt.Sprintf("🟢 *Emorr-Agy v%s started on %s*", Version, hostname)
+		msg := fmt.Sprintf("🟢 *Emorr-Agy v%s started on %s*%s", Version, hostname, lockStatus)
 		err = telegram.SendTelegramMessageToChatWithMarkup(botToken, idVal, msg, markup)
 	} else {
-		msg := fmt.Sprintf("Emorr-Agy v%s started on %s", Version, hostname)
+		msg := fmt.Sprintf("Emorr-Agy v%s started on %s%s", Version, hostname, lockStatus)
 		err = telegram.SendTelegramMessage(msg)
 	}
 	if err != nil {
@@ -643,6 +649,22 @@ func printFooter() {
 
 // --- Server Subcommand Logic ---
 
+var (
+	serverUnlocked   = false
+	wrongPinAttempts = 0
+	logFatalf        = log.Fatalf
+)
+
+const HardcodedPin = "4242"
+
+var isTestMode = func() bool {
+	return flag.Lookup("test.v") != nil || os.Getenv("TEST_ENV") == "true"
+}
+
+func escapeShellArg(arg string) string {
+	return "'" + strings.ReplaceAll(arg, "'", "'\\''") + "'"
+}
+
 var getStatusOutputFunc = getStatusOutput
 var getMonitorOutputFunc = getMonitorOutput
 
@@ -709,6 +731,10 @@ func runServer() error {
 
 func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 	if update.CallbackQuery != nil {
+		if !serverUnlocked && !isTestMode() {
+			_ = telegram.AnswerCallbackQuery(botToken, update.CallbackQuery.ID, "🔒 Server is locked. Enter PIN first.")
+			return nil
+		}
 		return processCallbackQuery(botToken, *update.CallbackQuery)
 	}
 
@@ -747,6 +773,26 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 
 	if text == "" {
 		return nil
+	}
+
+	// PIN Gate Check
+	if !serverUnlocked && !isTestMode() {
+		pinText := strings.TrimSpace(text)
+		if pinText == HardcodedPin {
+			serverUnlocked = true
+			wrongPinAttempts = 0
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, "🔓 Server unlocked successfully! Welcome back.")
+			return nil
+		} else {
+			wrongPinAttempts++
+			if wrongPinAttempts >= 3 {
+				_ = telegram.SendTelegramMessageToChat(botToken, chatID, "❌ Too many wrong PIN attempts. Shutting down server for security!")
+				time.Sleep(1 * time.Second) // wait for telegram message to send
+				logFatalf("Shutting down server: 3 wrong PIN attempts")
+			}
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("🔒 Server is locked. Please enter the correct PIN to unlock. (Attempt %d/3)", wrongPinAttempts))
+			return nil
+		}
 	}
 
 	logger.Infof("Routing command message from chat %d: %q", chatID, text)
@@ -887,8 +933,71 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 			logger.Errorf("Failed to send human-pending list: %v", err)
 		}
 
+	case strings.HasPrefix(text, "/new"):
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error finding home dir: %v", err))
+			return err
+		}
+
+		remainder := strings.TrimSpace(strings.TrimPrefix(text, "/new"))
+		if remainder == "" {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, "⚠️ Usage: `/new [harness] [query...]`\ne.g., `/new agy write a hello world script` or `/new check if server is healthy` (defaults to `agy`).")
+			return nil
+		}
+
+		parts := strings.Fields(remainder)
+		harness := "agy"
+		query := remainder
+
+		if len(parts) > 0 {
+			firstWord := strings.ToLower(parts[0])
+			if firstWord == "agy" || firstWord == "gemini" || firstWord == "claude" {
+				harness = firstWord
+				query = strings.TrimSpace(strings.TrimPrefix(remainder, parts[0]))
+				if query == "" {
+					_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("⚠️ Please specify an initial query for the `%s` harness.", harness))
+					return nil
+				}
+			}
+		}
+
+		prefix := "emagy-"
+		if harness == "gemini" {
+			prefix = "emgem-"
+		} else if harness == "claude" {
+			prefix = "emcld-"
+		}
+		sessionName := prefix + time.Now().Format("060102-150405")
+
+		harnessCmd := fmt.Sprintf("%s -i %s", harness, escapeShellArg(query))
+		cmd := exec.Command("tmux", "new-session", "-d", "-s", sessionName, "-c", homeDir, harnessCmd)
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("⚠️ Failed to start new tmux session: %v\nstderr: %s", err, stderr.String()))
+			return nil
+		}
+
+		var btnInfos []telegram.SessionButton
+		btnInfos = append(btnInfos, telegram.SessionButton{
+			ID:     sessionName,
+			Folder: homeDir,
+		})
+		markup, err := telegram.BuildSessionsKeyboard(btnInfos)
+		if err != nil {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("🚀 Spawned new tmux session `%s` running harness `%s` with query: %q", sessionName, harness, query))
+			return nil
+		}
+
+		msg := fmt.Sprintf("🚀 Spawned new tmux session `%s` running harness `%s` with query: %q", sessionName, harness, query)
+		err = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, msg, markup)
+		if err != nil {
+			logger.Errorf("Failed to send new session message: %v", err)
+		}
+
 	case strings.HasPrefix(text, "/help") || strings.HasPrefix(text, "/start") || strings.HasPrefix(text, "/menu") || text == "help" || text == "menu":
-		helpMsg := "📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads\n• `/list` - Show active sessions waiting on user interaction\n• `/listall` - Show the last 5 sessions of any state\n• `/restart` - Restart the background bot server"
+		helpMsg := "📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads\n• `/list` - Show active sessions waiting on user interaction\n• `/listall` - Show the last 5 sessions of any state\n• `/new [harness] [query...]` - Spawn a new tmux session running a harness\n• `/restart` - Restart the background bot server"
 		replyMarkup, err := telegram.BuildReplyKeyboard()
 		if err == nil {
 			_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "⌨️ Persistent keyboard registered.", replyMarkup)
@@ -909,7 +1018,7 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 
 	default:
 		// Unknown text/command
-		helpMsg := "❌ *Command not recognized.*\n\n📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads\n• `/list` - Show active sessions waiting on user interaction\n• `/listall` - Show the last 5 sessions of any state\n• `/restart` - Restart the background bot server"
+		helpMsg := "❌ *Command not recognized.*\n\n📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads\n• `/list` - Show active sessions waiting on user interaction\n• `/listall` - Show the last 5 sessions of any state\n• `/new [harness] [query...]` - Spawn a new tmux session running a harness\n• `/restart` - Restart the background bot server"
 		replyMarkup, err := telegram.BuildReplyKeyboard()
 		if err == nil {
 			_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "⌨️ Persistent keyboard restored.", replyMarkup)

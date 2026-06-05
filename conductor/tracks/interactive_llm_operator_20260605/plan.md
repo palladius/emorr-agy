@@ -13,8 +13,8 @@
 - [ ] Task 2.4: Conductor - User Manual Verification 'Phase 2: Session Revival & Callback Routing' (Protocol in workflow.md)
 
 ## Phase 3: LLM Operator ("Cindy"), New Harness Command & PIN Gate
-- [ ] Task 3.1: Implement PIN gate check (`4242`) in the Telegram bot update handler in `main.go` (lock server on startup, terminate on 3 wrong attempts).
-- [ ] Task 3.2: Implement `/new [harness] [query...]` command in `main.go` to spawn a new tmux session and run the harness with the interactive prompt query.
+- [x] Task 3.1: Implement PIN gate check (`4242`) in the Telegram bot update handler in `main.go` (lock server on startup, terminate on 3 wrong attempts).
+- [x] Task 3.2: Implement `/new [harness] [query...]` command in `main.go` to spawn a new tmux session and run the harness with the interactive prompt query.
 - [ ] Task 3.3: Write unit tests verifying `/ask` parsing, loading the system prompt from `etc/prompts/cindy.txt`, and resolving intents.
 - [ ] Task 3.4: Implement the `/ask` command handler and template loader in `internal/operator/cindy.go`.
 - [ ] Task 3.5: Conductor - User Manual Verification 'Phase 3: LLM Operator ("Cindy"), New Harness Command & PIN Gate' (Protocol in workflow.md)

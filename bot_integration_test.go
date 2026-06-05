@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -325,5 +326,205 @@ fi
 	// It should have executed the command and updated message
 	if !strings.Contains(lastMethod, "editMessageText") {
 		t.Errorf("expected last method to be editMessageText, got %q", lastMethod)
+	}
+}
+
+func TestPingate(t *testing.T) {
+	// Mock Telegram API server to check messages sent
+	var lastSentText string
+	telegramServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = r.ParseForm()
+		if strings.Contains(r.URL.Path, "sendMessage") {
+			lastSentText = r.Form.Get("text")
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer telegramServer.Close()
+
+	// Redirect telegram endpoints
+	oldTelegramBaseURL := telegram.BaseURL
+	telegram.BaseURL = telegramServer.URL
+	defer func() {
+		telegram.BaseURL = oldTelegramBaseURL
+	}()
+
+	// Override isTestMode to return false so we enter the PIN gate
+	oldIsTestMode := isTestMode
+	isTestMode = func() bool { return false }
+	defer func() { isTestMode = oldIsTestMode }()
+
+	// Reset PIN gate states
+	serverUnlocked = false
+	wrongPinAttempts = 0
+
+	// 1. Send wrong PIN
+	updateWrong := telegram.TelegramUpdate{
+		UpdateID: 101,
+		Message: &telegram.TelegramMessage{
+			MessageID: 1,
+			Chat: telegram.TelegramChat{ID: 12345},
+			Text: "1111",
+		},
+	}
+	err := processUpdate("bot-token", updateWrong)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if serverUnlocked {
+		t.Error("expected server to remain locked after wrong PIN")
+	}
+	if wrongPinAttempts != 1 {
+		t.Errorf("expected wrongPinAttempts to be 1, got %d", wrongPinAttempts)
+	}
+	if !strings.Contains(lastSentText, "Server is locked") {
+		t.Errorf("expected warning message, got %q", lastSentText)
+	}
+
+	// 2. Send correct PIN
+	updateCorrect := telegram.TelegramUpdate{
+		UpdateID: 102,
+		Message: &telegram.TelegramMessage{
+			MessageID: 2,
+			Chat: telegram.TelegramChat{ID: 12345},
+			Text: "4242",
+		},
+	}
+	err = processUpdate("bot-token", updateCorrect)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !serverUnlocked {
+		t.Error("expected server to be unlocked after correct PIN")
+	}
+	if wrongPinAttempts != 0 {
+		t.Errorf("expected wrongPinAttempts to be reset to 0, got %d", wrongPinAttempts)
+	}
+	if !strings.Contains(lastSentText, "Server unlocked successfully") {
+		t.Errorf("expected success message, got %q", lastSentText)
+	}
+}
+
+func TestPingateFatalKills(t *testing.T) {
+	// Mock Telegram API server
+	telegramServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer telegramServer.Close()
+
+	oldTelegramBaseURL := telegram.BaseURL
+	telegram.BaseURL = telegramServer.URL
+	defer func() {
+		telegram.BaseURL = oldTelegramBaseURL
+	}()
+
+	// Override isTestMode
+	oldIsTestMode := isTestMode
+	isTestMode = func() bool { return false }
+	defer func() { isTestMode = oldIsTestMode }()
+
+	// Reset PIN gate states
+	serverUnlocked = false
+	wrongPinAttempts = 0
+
+	// Mock logFatalf
+	fatalCalled := false
+	var fatalMsg string
+	oldLogFatalf := logFatalf
+	logFatalf = func(format string, v ...interface{}) {
+		fatalCalled = true
+		fatalMsg = fmt.Sprintf(format, v...)
+	}
+	defer func() { logFatalf = oldLogFatalf }()
+
+	updateWrong := telegram.TelegramUpdate{
+		UpdateID: 101,
+		Message: &telegram.TelegramMessage{
+			MessageID: 1,
+			Chat: telegram.TelegramChat{ID: 12345},
+			Text: "wrong",
+		},
+	}
+
+	// Send wrong PIN 3 times
+	for i := 0; i < 3; i++ {
+		_ = processUpdate("bot-token", updateWrong)
+	}
+
+	if !fatalCalled {
+		t.Error("expected logFatalf to be called after 3 wrong PIN attempts")
+	}
+	if !strings.Contains(fatalMsg, "3 wrong PIN attempts") {
+		t.Errorf("expected fatal msg to mention 3 wrong PIN attempts, got %q", fatalMsg)
+	}
+}
+
+func TestNewCommand(t *testing.T) {
+	// Mock Telegram API server
+	var lastSentText string
+	var lastSentMarkup string
+	telegramServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = r.ParseForm()
+		if strings.Contains(r.URL.Path, "sendMessage") {
+			lastSentText = r.Form.Get("text")
+			lastSentMarkup = r.Form.Get("reply_markup")
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer telegramServer.Close()
+
+	oldTelegramBaseURL := telegram.BaseURL
+	telegram.BaseURL = telegramServer.URL
+	defer func() {
+		telegram.BaseURL = oldTelegramBaseURL
+	}()
+
+	// Mock a bin folder for tmux
+	tempDir := t.TempDir()
+	mockBinDir := filepath.Join(tempDir, "bin")
+	_ = os.MkdirAll(mockBinDir, 0755)
+	
+	// Create mock tmux script
+	mockTmuxContent := `#!/bin/bash
+echo "mock tmux called with args: $@"
+exit 0
+`
+	_ = os.WriteFile(filepath.Join(mockBinDir, "tmux"), []byte(mockTmuxContent), 0755)
+
+	originalPath := os.Getenv("PATH")
+	t.Setenv("PATH", mockBinDir+":"+originalPath)
+	t.Setenv("HOME", tempDir)
+
+	updateNew := telegram.TelegramUpdate{
+		UpdateID: 101,
+		Message: &telegram.TelegramMessage{
+			MessageID: 1,
+			Chat: telegram.TelegramChat{ID: 12345},
+			Text: "/new gemini write a go test",
+		},
+	}
+
+	err := processUpdate("bot-token", updateNew)
+	if err != nil {
+		t.Fatalf("unexpected error processing /new: %v", err)
+	}
+
+	if !strings.Contains(lastSentText, "Spawned new tmux session") {
+		t.Errorf("expected text to mention spawned session, got %q", lastSentText)
+	}
+	if !strings.Contains(lastSentText, "harness `gemini`") {
+		t.Errorf("expected harness to be gemini, got %q", lastSentText)
+	}
+	if !strings.Contains(lastSentText, "query: \"write a go test\"") {
+		t.Errorf("expected query to be parsed, got %q", lastSentText)
+	}
+	// Verify that the reply markup contains the session name button
+	if !strings.Contains(lastSentMarkup, "emgem-") {
+		t.Errorf("expected markup to contain inline button for session, got %q", lastSentMarkup)
 	}
 }

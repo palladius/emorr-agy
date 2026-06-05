@@ -54,7 +54,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 	case "long":
 		tw := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
-		fmt.Fprintf(tw, "%s\t%s\t%s\v%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			color.Colorize("ST T", color.Plain),
 			color.Colorize("  SESSION ID", color.Plain),
 			color.Colorize("AGE", color.Plain),
@@ -67,19 +67,21 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		hasPrintedSeparator := false
 		for _, s := range sessions {
 			if s.State == StateDeadArchived && !hasPrintedSeparator {
-				fmt.Fprintln(tw, "---\t---\t---\v---\t---\t---\t---\t---")
+				fmt.Fprintln(tw, "---\t---\t---\t---\t---\t---\t---\t---")
 				hasPrintedSeparator = true
 			}
 			emoji := formatStatus(s)
 			harnessEmoji := getEmojiForHarness(s.Harness)
 			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
-			if len(folder) > 15 {
-				folder = folder[:12] + "..."
+			if len(folder) > 25 {
+				folder = folder[:22] + "..."
 			}
 
 			ageColor := color.LightGray
-			if strings.Contains(age, "d") || age == "n/a" {
+			if !s.LastActivity.IsZero() && time.Since(s.LastActivity) < time.Hour {
+				ageColor = color.Green
+			} else if strings.Contains(age, "d") || age == "n/a" {
 				ageColor = color.DarkGray
 			}
 
@@ -90,10 +92,10 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			}
 
 			statusAndHarness := fmt.Sprintf("%s %s", emoji, harnessEmoji)
-			fmt.Fprintf(tw, "%s\t%s\t%s\v%s\t%s\t%s\t%s\t%s\n",
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				color.Colorize(statusAndHarness, color.Plain),
 				color.Colorize(s.ID, color.BoldWhite),
-				color.Colorize(age, ageColor),
+				color.Colorize(fmt.Sprintf("%3s", age), ageColor),
 				color.Colorize(folder, color.Blue),
 				color.Colorize(s.Harness, color.Plain),
 				color.Colorize(strconv.Itoa(s.ProcessCount), color.Plain),
@@ -105,7 +107,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 	default: // "short" or fallback
 		tw := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
-		fmt.Fprintf(tw, "%s\t%s\t%s\v%s\t%s\n",
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
 			color.Colorize("ST T", color.Plain),
 			color.Colorize("  SESSION ID", color.Plain),
 			color.Colorize("AGE", color.Plain),
@@ -115,19 +117,21 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		hasPrintedSeparator := false
 		for _, s := range sessions {
 			if s.State == StateDeadArchived && !hasPrintedSeparator {
-				fmt.Fprintln(tw, "---\t---\t---\v---\t---")
+				fmt.Fprintln(tw, "---\t---\t---\t---\t---")
 				hasPrintedSeparator = true
 			}
 			emoji := formatStatus(s)
 			harnessEmoji := getEmojiForHarness(s.Harness)
 			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
-			if len(folder) > 15 {
-				folder = folder[:12] + "..."
+			if len(folder) > 25 {
+				folder = folder[:22] + "..."
 			}
 
 			ageColor := color.LightGray
-			if strings.Contains(age, "d") || age == "n/a" {
+			if !s.LastActivity.IsZero() && time.Since(s.LastActivity) < time.Hour {
+				ageColor = color.Green
+			} else if strings.Contains(age, "d") || age == "n/a" {
 				ageColor = color.DarkGray
 			}
 
@@ -138,10 +142,10 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			}
 
 			statusAndHarness := fmt.Sprintf("%s %s", emoji, harnessEmoji)
-			fmt.Fprintf(tw, "%s\t%s\t%s\v%s\t%s\n",
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
 				color.Colorize(statusAndHarness, color.Plain),
 				color.Colorize(s.ID, color.BoldWhite),
-				color.Colorize(age, ageColor),
+				color.Colorize(fmt.Sprintf("%3s", age), ageColor),
 				color.Colorize(folder, color.Blue),
 				color.Colorize(desc, color.Cyan),
 			)

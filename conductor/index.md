@@ -28,6 +28,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 - [audio_transcription_model_fix_20260604](tracks/audio_transcription_model_fix_20260604/index.md) (completed)
 - [shell_autocompletion_20260604](tracks/shell_autocompletion_20260604/index.md) (planned)
 - [telegram_server_interactive_commands_20260604](tracks/telegram_server_interactive_commands_20260604/index.md) (planned)
+- [interactive_llm_operator_20260605](tracks/interactive_llm_operator_20260605/index.md) (planned)
 
 ## References
 - [Product Guide](product.md)
@@ -79,4 +80,9 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 - [x] **Track: Telegram Server interactive commands /list and /listall for session response handling.**
 *Link: [./tracks/telegram_server_interactive_commands_20260604/](./tracks/telegram_server_interactive_commands_20260604/)*
+
+---
+
+- [ ] **Track: Add interactive Telegram buttons, LLM operator (Cindy) via /ask, and MCP command sandboxing to the server daemon.**
+*Link: [./tracks/interactive_llm_operator_20260605/](./tracks/interactive_llm_operator_20260605/)*
 

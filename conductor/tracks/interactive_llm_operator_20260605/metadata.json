@@ -1,0 +1,8 @@
+{
+  "track_id": "interactive_llm_operator_20260605",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-06-05T10:36:00Z",
+  "updated_at": "2026-06-05T10:36:00Z",
+  "description": "Add interactive Telegram buttons, LLM operator (Cindy) via /ask, and MCP command sandboxing to the server daemon."
+}

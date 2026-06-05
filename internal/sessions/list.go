@@ -54,7 +54,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 	case "long":
 		tw := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(tw, "%s\t%s\t%s\v%s\t%s\t%s\t%s\t%s\n",
 			color.Colorize("ST T", color.Plain),
 			color.Colorize("  SESSION ID", color.Plain),
 			color.Colorize("AGE", color.Plain),
@@ -67,7 +67,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		hasPrintedSeparator := false
 		for _, s := range sessions {
 			if s.State == StateDeadArchived && !hasPrintedSeparator {
-				fmt.Fprintln(tw, "---\t---\t---\t---\t---\t---\t---\t---")
+				fmt.Fprintln(tw, "---\t---\t---\v---\t---\t---\t---\t---")
 				hasPrintedSeparator = true
 			}
 			emoji := formatStatus(s)
@@ -90,7 +90,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			}
 
 			statusAndHarness := fmt.Sprintf("%s %s", emoji, harnessEmoji)
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			fmt.Fprintf(tw, "%s\t%s\t%s\v%s\t%s\t%s\t%s\t%s\n",
 				color.Colorize(statusAndHarness, color.Plain),
 				color.Colorize(s.ID, color.BoldWhite),
 				color.Colorize(age, ageColor),
@@ -98,14 +98,14 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				color.Colorize(s.Harness, color.Plain),
 				color.Colorize(strconv.Itoa(s.ProcessCount), color.Plain),
 				color.Colorize(s.ResumeCommand, color.Plain),
-				color.Colorize(desc, color.Yellow),
+				color.Colorize(desc, color.Cyan),
 			)
 		}
 		tw.Flush()
 
 	default: // "short" or fallback
 		tw := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(tw, "%s\t%s\t%s\v%s\t%s\n",
 			color.Colorize("ST T", color.Plain),
 			color.Colorize("  SESSION ID", color.Plain),
 			color.Colorize("AGE", color.Plain),
@@ -115,7 +115,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		hasPrintedSeparator := false
 		for _, s := range sessions {
 			if s.State == StateDeadArchived && !hasPrintedSeparator {
-				fmt.Fprintln(tw, "---\t---\t---\t---\t---")
+				fmt.Fprintln(tw, "---\t---\t---\v---\t---")
 				hasPrintedSeparator = true
 			}
 			emoji := formatStatus(s)
@@ -138,12 +138,12 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			}
 
 			statusAndHarness := fmt.Sprintf("%s %s", emoji, harnessEmoji)
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+			fmt.Fprintf(tw, "%s\t%s\t%s\v%s\t%s\n",
 				color.Colorize(statusAndHarness, color.Plain),
 				color.Colorize(s.ID, color.BoldWhite),
 				color.Colorize(age, ageColor),
 				color.Colorize(folder, color.Blue),
-				color.Colorize(desc, color.Yellow),
+				color.Colorize(desc, color.Cyan),
 			)
 		}
 		tw.Flush()

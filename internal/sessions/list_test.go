@@ -26,7 +26,7 @@ func TestListSessionsFormats(t *testing.T) {
 
 	engine := NewClassificationEngine(mockTmux, mockFS, "/home/ricc")
 
-	t.Run("Short Format (Default)", func(t *testing.T) {
+	t.Run("Short Format (Default - Excludes Archived)", func(t *testing.T) {
 		var buf bytes.Buffer
 		err := ListSessions(&buf, engine, ListOptions{Format: "short"})
 		if err != nil {
@@ -35,7 +35,7 @@ func TestListSessionsFormats(t *testing.T) {
 
 		output := buf.String()
 		// Expect header and columns
-		if !strings.Contains(output, "STATUS") || !strings.Contains(output, "TYPE") || !strings.Contains(output, "SESSION ID") || !strings.Contains(output, "DIRECTORY") {
+		if !strings.Contains(output, "STATUS") || !strings.Contains(output, "TYPE") || !strings.Contains(output, "SESSION ID") || !strings.Contains(output, "DIRECTORY") || !strings.Contains(output, "DESCRIPTION") {
 			t.Errorf("missing headers in short format output: %q", output)
 		}
 		if !strings.Contains(output, "🎈") {
@@ -47,23 +47,39 @@ func TestListSessionsFormats(t *testing.T) {
 		if !strings.Contains(output, "🔒") || !strings.Contains(output, "my-private-session") {
 			t.Errorf("missing private session details in short format: %q", output)
 		}
-		if !strings.Contains(output, "⚫") || !strings.Contains(output, "session-Chumbia") {
-			t.Errorf("missing dead archived session details in short format: %q", output)
+		if strings.Contains(output, "⚫") || strings.Contains(output, "session-Chumbia") {
+			t.Errorf("archived session should be filtered out by default: %q", output)
 		}
 		if !strings.Contains(output, "💤") || !strings.Contains(output, "session-dead-active") {
 			t.Errorf("missing dead resuscitatable session details in short format: %q", output)
 		}
 	})
 
-	t.Run("Long Format", func(t *testing.T) {
+	t.Run("Short Format (All - Includes Archived and Separator)", func(t *testing.T) {
 		var buf bytes.Buffer
-		err := ListSessions(&buf, engine, ListOptions{Format: "long"})
+		err := ListSessions(&buf, engine, ListOptions{Format: "short", All: true})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
 		output := buf.String()
-		if !strings.Contains(output, "HARNESS") || !strings.Contains(output, "WINDOWS") || !strings.Contains(output, "RESUME COMMAND") {
+		if !strings.Contains(output, "⚫") || !strings.Contains(output, "session-Chumbia") {
+			t.Errorf("missing dead archived session details when All is true: %q", output)
+		}
+		if !strings.Contains(output, "---") {
+			t.Errorf("missing visual separator when archived sessions are included: %q", output)
+		}
+	})
+
+	t.Run("Long Format", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := ListSessions(&buf, engine, ListOptions{Format: "long", All: true})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		output := buf.String()
+		if !strings.Contains(output, "HARNESS") || !strings.Contains(output, "WINDOWS") || !strings.Contains(output, "RESUME COMMAND") || !strings.Contains(output, "DESCRIPTION") {
 			t.Errorf("missing headers in long format output: %q", output)
 		}
 		if !strings.Contains(output, "tmux attach -t emagy-session-1") && !strings.Contains(output, "emorr-agy resume") {
@@ -71,9 +87,9 @@ func TestListSessionsFormats(t *testing.T) {
 		}
 	})
 
-	t.Run("JSON Format", func(t *testing.T) {
+	t.Run("JSON Format (All)", func(t *testing.T) {
 		var buf bytes.Buffer
-		err := ListSessions(&buf, engine, ListOptions{Format: "json"})
+		err := ListSessions(&buf, engine, ListOptions{Format: "json", All: true})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -88,9 +104,9 @@ func TestListSessionsFormats(t *testing.T) {
 		}
 	})
 
-	t.Run("Filter by Harness", func(t *testing.T) {
+	t.Run("Filter by Harness (All)", func(t *testing.T) {
 		var buf bytes.Buffer
-		err := ListSessions(&buf, engine, ListOptions{Format: "json", Harness: []string{"agy"}})
+		err := ListSessions(&buf, engine, ListOptions{Format: "json", Harness: []string{"agy"}, All: true})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -101,7 +117,6 @@ func TestListSessionsFormats(t *testing.T) {
 		}
 
 		// emagy-session-1 (agy), session-Chumbia (agy), session-dead-active (agy)
-		// my-private-session (unknown)
 		if len(sessionsList) != 3 {
 			t.Errorf("expected 3 sessions in filtered JSON, got %d", len(sessionsList))
 		}

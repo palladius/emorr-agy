@@ -88,11 +88,14 @@ func main() {
 			fs := flag.NewFlagSet("sessions list", flag.ExitOnError)
 			var harnessFlag string
 			var jsonFlag, longFlag, shortFlag bool
+			var allFlag bool
 
 			fs.StringVar(&harnessFlag, "harness", "", "Filter by harness type (comma-separated list, e.g. agy,gemini)")
 			fs.BoolVar(&jsonFlag, "json", false, "JSON output format")
 			fs.BoolVar(&longFlag, "long", false, "Long tabular output format")
 			fs.BoolVar(&shortFlag, "short", false, "Short tabular output format (default)")
+			fs.BoolVar(&allFlag, "all", false, "Include archived sessions")
+			fs.BoolVar(&allFlag, "a", false, "Include archived sessions (shorthand)")
 
 			_ = fs.Parse(os.Args[3:])
 
@@ -117,6 +120,7 @@ func main() {
 			opts := sessions.ListOptions{
 				Harness: harnesses,
 				Format:  format,
+				All:     allFlag,
 			}
 			if err := sessions.ListSessions(os.Stdout, engine, opts); err != nil {
 				log.Fatalf("Error listing sessions: %v", err)

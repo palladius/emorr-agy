@@ -158,6 +158,18 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 				}
 			}
 
+			// Read description/about from cache
+			var description string
+			cachePath := filepath.Join(c.homeDir, ".emorr-agy/cache", id+".json")
+			if data, err := c.fs.ReadFile(cachePath); err == nil {
+				var cacheRes struct {
+					About string `json:"about"`
+				}
+				if err := json.Unmarshal(data, &cacheRes); err == nil {
+					description = cacheRes.About
+				}
+			}
+
 			attachedClients := ts.AttachedClients
 			if attachedClients == 0 && ts.Attached {
 				attachedClients = 1
@@ -172,6 +184,7 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 				LastActivity:    lastActivity,
 				ResumeCommand:   "tmux attach -t " + ts.Name,
 				AttachedClients: attachedClients,
+				Description:     description,
 			}
 			sessions = append(sessions, s)
 		}
@@ -190,35 +203,33 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 
 				harness := "agy" // fallback for historical
 				var state SessionState
+				var cachedAbout string
+				worthResuscitate := true
+
+				// Load cache details
+				cachePath := filepath.Join(c.homeDir, ".emorr-agy/cache", convID+".json")
+				if data, err := c.fs.ReadFile(cachePath); err == nil {
+					var cacheRes struct {
+						About            string `json:"about"`
+						UserInputPending bool   `json:"user_input_pending"`
+						WorthResuscitate bool   `json:"worth_resuscitate"`
+					}
+					if err := json.Unmarshal(data, &cacheRes); err == nil {
+						worthResuscitate = cacheRes.WorthResuscitate
+						cachedAbout = cacheRes.About
+					}
+				}
 
 				// If it's active in background processes but not in tmux, it's StateOpenAgy (emoji 🟢)
 				if _, active := activeConvs[convID]; active {
 					state = StateOpenAgy
 					runningMap[convID] = true
 				} else {
-					// It's dead. Check LLM cache for worth_resuscitate first.
-					worthResuscitate := true
-					cachePath := filepath.Join(c.homeDir, ".emorr-agy/cache", convID+".json")
-					var cachedAbout string
-					if data, err := c.fs.ReadFile(cachePath); err == nil {
-						var cacheRes struct {
-							About            string `json:"about"`
-							UserInputPending bool   `json:"user_input_pending"`
-							WorthResuscitate bool   `json:"worth_resuscitate"`
-						}
-						if err := json.Unmarshal(data, &cacheRes); err == nil {
-							worthResuscitate = cacheRes.WorthResuscitate
-							cachedAbout = cacheRes.About
-						}
-					}
-
 					if !worthResuscitate || c.isExcluded(convID, folder) {
 						state = StateDeadArchived
 					} else {
 						state = StateDeadResuscitatable
 					}
-
-					_ = cachedAbout // Can be used in description if we want
 				}
 
 				// Determine last activity time from SQLite DB
@@ -239,14 +250,21 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 					Folder:        folder,
 					LastActivity:  lastActivity,
 					ResumeCommand: "emorr-agy resume " + convID,
+					Description:   cachedAbout,
 				}
 				sessions = append(sessions, s)
 			}
 		}
 	}
 
-	// 3. Sort sessions by last activity (mod time) descending, latest first
+	// 3. Sort sessions: non-archived sessions on top, archived sessions at the bottom.
+	// Within those two groups, sort by last activity (mod time) descending, latest first.
 	sort.Slice(sessions, func(i, j int) bool {
+		iArchived := sessions[i].State == StateDeadArchived
+		jArchived := sessions[j].State == StateDeadArchived
+		if iArchived != jArchived {
+			return !iArchived
+		}
 		if sessions[i].LastActivity.Equal(sessions[j].LastActivity) {
 			return sessions[i].ID < sessions[j].ID
 		}

@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parsed and displayed the number of attached clients to tmux sessions.
 - Visual status indicators: detached tmux sessions show as `💤` (asleep/detached) and attached sessions show as `💻` (or `💻(N)` if multiple clients are attached).
 - Added unit tests for the tmux session attachment formatting logic.
+- Loaded session descriptions (`about` field) from the cache and surfaced a `DESCRIPTION` column in the session list output.
+- Filtered out archived sessions (`⚫`) from the default list to keep it clean.
+- Added `-a` / `--all` flags to include archived sessions in the list output, positioned at the bottom of the list under a visual dashed divider.
 
 ## [0.1.2] - 2026-06-04
 

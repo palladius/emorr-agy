@@ -933,16 +933,22 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 			logger.Errorf("Failed to send human-pending list: %v", err)
 		}
 
-	case strings.HasPrefix(text, "/new"):
+	case strings.HasPrefix(text, "/new") || strings.HasPrefix(strings.ToLower(text), "new ") || strings.ToLower(text) == "new":
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("Error finding home dir: %v", err))
 			return err
 		}
 
-		remainder := strings.TrimSpace(strings.TrimPrefix(text, "/new"))
+		var remainder string
+		if strings.HasPrefix(text, "/new") {
+			remainder = strings.TrimSpace(strings.TrimPrefix(text, "/new"))
+		} else if strings.HasPrefix(strings.ToLower(text), "new ") {
+			remainder = strings.TrimSpace(text[4:])
+		}
+
 		if remainder == "" {
-			_ = telegram.SendTelegramMessageToChat(botToken, chatID, "⚠️ Usage: `/new [harness] [query...]`\ne.g., `/new agy write a hello world script` or `/new check if server is healthy` (defaults to `agy`).")
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, "⚠️ Usage: `/new [harness] [query...]` or `new [harness] [query...]`\ne.g., `new agy write a hello world script` or `new check if server is healthy` (defaults to `agy`).")
 			return nil
 		}
 

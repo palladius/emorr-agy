@@ -527,4 +527,31 @@ exit 0
 	if !strings.Contains(lastSentMarkup, "emgem-") {
 		t.Errorf("expected markup to contain inline button for session, got %q", lastSentMarkup)
 	}
+
+	// Test case: voice command "new claude test voice input"
+	updateVoice := telegram.TelegramUpdate{
+		UpdateID: 102,
+		Message: &telegram.TelegramMessage{
+			MessageID: 2,
+			Chat: telegram.TelegramChat{ID: 12345},
+			Text: "new claude test voice input",
+		},
+	}
+	err = processUpdate("bot-token", updateVoice)
+	if err != nil {
+		t.Fatalf("unexpected error processing voice new: %v", err)
+	}
+
+	if !strings.Contains(lastSentText, "Spawned new tmux session") {
+		t.Errorf("expected text to mention spawned session, got %q", lastSentText)
+	}
+	if !strings.Contains(lastSentText, "harness `claude`") {
+		t.Errorf("expected harness to be claude, got %q", lastSentText)
+	}
+	if !strings.Contains(lastSentText, "query: \"test voice input\"") {
+		t.Errorf("expected query to be parsed, got %q", lastSentText)
+	}
+	if !strings.Contains(lastSentMarkup, "emcld-") {
+		t.Errorf("expected markup to contain inline button for session, got %q", lastSentMarkup)
+	}
 }

@@ -212,7 +212,7 @@ func FormatAge(t time.Time) string {
 	}
 	d := time.Since(t)
 	if d < time.Minute {
-		return fmt.Sprintf("%ds", int(d.Seconds()))
+		return "<1m"
 	}
 	if d < time.Hour {
 		return fmt.Sprintf("%dm", int(d.Minutes()))

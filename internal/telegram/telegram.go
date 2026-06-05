@@ -323,3 +323,35 @@ func BuildMenuKeyboard() (string, error) {
 	return string(data), nil
 }
 
+type ReplyKeyboardMarkup struct {
+	Keyboard        [][]KeyboardButton `json:"keyboard"`
+	ResizeKeyboard  bool               `json:"resize_keyboard,omitempty"`
+	OneTimeKeyboard bool               `json:"one_time_keyboard,omitempty"`
+}
+
+type KeyboardButton struct {
+	Text string `json:"text"`
+}
+
+// BuildReplyKeyboard constructs the persistent reply keyboard markup JSON for the chat.
+func BuildReplyKeyboard() (string, error) {
+	markup := ReplyKeyboardMarkup{
+		Keyboard: [][]KeyboardButton{
+			{
+				{Text: "/status"},
+				{Text: "/list"},
+			},
+			{
+				{Text: "/monitor"},
+				{Text: "/help"},
+			},
+		},
+		ResizeKeyboard: true,
+	}
+	data, err := json.Marshal(markup)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+

@@ -495,8 +495,26 @@ func sendStartupNotification() {
 	if err != nil {
 		hostname = "unknown"
 	}
-	msg := fmt.Sprintf("Emorr-Agy v%s started on %s", Version, hostname)
-	err = telegram.SendTelegramMessage(msg)
+	botToken := getEnvWithFallback("TELEGRAM_BOT_ID", "TELEGRAM_BOT_TOKEN", "TELEGRAM_APITOKEN")
+	botToken = cleanValue(botToken)
+	chatID := getEnvWithFallback("TELEGRAM_CHAT_ID", "TELEGRAM_CHANNEL_ID")
+	chatID = cleanValue(chatID)
+	if chatID == "" {
+		chatID = "605724096"
+	}
+	idVal, err := strconv.ParseInt(chatID, 10, 64)
+	if err != nil {
+		idVal = 605724096
+	}
+
+	markup, err := telegram.BuildReplyKeyboard()
+	if err == nil && botToken != "" {
+		msg := fmt.Sprintf("🟢 *Emorr-Agy v%s started on %s*", Version, hostname)
+		err = telegram.SendTelegramMessageToChatWithMarkup(botToken, idVal, msg, markup)
+	} else {
+		msg := fmt.Sprintf("Emorr-Agy v%s started on %s", Version, hostname)
+		err = telegram.SendTelegramMessage(msg)
+	}
 	if err != nil {
 		logger.Errorf("Failed to send startup notification: %v", err)
 	}
@@ -854,6 +872,10 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 
 	case strings.HasPrefix(text, "/help") || strings.HasPrefix(text, "/start") || strings.HasPrefix(text, "/menu") || text == "help" || text == "menu":
 		helpMsg := "📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads\n• `/list` - Show active sessions waiting on user interaction\n• `/listall` - Show the last 5 sessions of any state\n• `/restart` - Restart the background bot server"
+		replyMarkup, err := telegram.BuildReplyKeyboard()
+		if err == nil {
+			_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "⌨️ Persistent keyboard registered.", replyMarkup)
+		}
 		markup, err := telegram.BuildMenuKeyboard()
 		if err != nil {
 			_ = telegram.SendTelegramMessageToChat(botToken, chatID, helpMsg)
@@ -871,6 +893,10 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 	default:
 		// Unknown text/command
 		helpMsg := "❌ *Command not recognized.*\n\n📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads\n• `/list` - Show active sessions waiting on user interaction\n• `/listall` - Show the last 5 sessions of any state\n• `/restart` - Restart the background bot server"
+		replyMarkup, err := telegram.BuildReplyKeyboard()
+		if err == nil {
+			_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "⌨️ Persistent keyboard restored.", replyMarkup)
+		}
 		markup, err := telegram.BuildMenuKeyboard()
 		if err == nil {
 			_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, helpMsg, markup)

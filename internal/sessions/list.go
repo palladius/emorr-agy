@@ -74,8 +74,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			harnessEmoji := getEmojiForHarness(s.Harness)
 			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
-			if len(folder) > 25 {
-				folder = folder[:22] + "..."
+			if len(folder) > 30 {
+				folder = folder[:27] + "..."
 			}
 
 			ageColor := color.LightGray
@@ -87,8 +87,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 			desc := strings.TrimSpace(s.Description)
 			desc = strings.ReplaceAll(desc, "\n", " ")
-			if len(desc) > 50 {
-				desc = desc[:47] + "..."
+			if len(desc) > 60 {
+				desc = desc[:57] + "..."
 			}
 
 			statusAndHarness := fmt.Sprintf("%s %s", emoji, harnessEmoji)
@@ -124,8 +124,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			harnessEmoji := getEmojiForHarness(s.Harness)
 			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
-			if len(folder) > 25 {
-				folder = folder[:22] + "..."
+			if len(folder) > 30 {
+				folder = folder[:27] + "..."
 			}
 
 			ageColor := color.LightGray
@@ -137,8 +137,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 			desc := strings.TrimSpace(s.Description)
 			desc = strings.ReplaceAll(desc, "\n", " ")
-			if len(desc) > 50 {
-				desc = desc[:47] + "..."
+			if len(desc) > 60 {
+				desc = desc[:57] + "..."
 			}
 
 			statusAndHarness := fmt.Sprintf("%s %s", emoji, harnessEmoji)

@@ -49,7 +49,7 @@ func TestListSessionsFormats(t *testing.T) {
 		if !strings.Contains(output, "💻") || !strings.Contains(output, "emagy-session-1") || !strings.Contains(output, "/workspace/proj1") {
 			t.Errorf("missing open tmux session details in short format: %q", output)
 		}
-		if !strings.Contains(output, "This is a super long description that is defini...") {
+		if !strings.Contains(output, "This is a super long description that is definitely longe...") {
 			t.Errorf("missing truncated description in short format: %q", output)
 		}
 		if !strings.Contains(output, "🔒") || !strings.Contains(output, "my-private-session") {

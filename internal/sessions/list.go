@@ -93,7 +93,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				color.Colorize(s.Harness, color.Plain),
 				color.Colorize(strconv.Itoa(s.ProcessCount), color.Plain),
 				color.Colorize(s.ResumeCommand, color.Plain),
-				color.Colorize(desc, color.Plain),
+				color.Colorize(desc, color.Yellow),
 			)
 		}
 		tw.Flush()
@@ -133,7 +133,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				color.Colorize(s.ID, color.BoldWhite),
 				color.Colorize(age, ageColor),
 				color.Colorize(folder, color.Blue),
-				color.Colorize(desc, color.Plain),
+				color.Colorize(desc, color.Yellow),
 			)
 		}
 		tw.Flush()

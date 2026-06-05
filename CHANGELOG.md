@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-06-05
+
+### Added
+- Implemented `emorr-agy resume <id>` subcommand to allow resuming or resuscitating sessions directly from the CLI.
+- Automatically handles running sessions (attaching to existing tmux session) and dead sessions (spawning new tmux session and running the correct harness command for `agy` or `gemini`).
+- Added robust unit testing for the `ResumeSession` command covering all execution paths.
+
 ## [0.1.3] - 2026-06-05
 
 ### Added

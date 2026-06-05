@@ -23,7 +23,7 @@ import (
 	"github.com/palladius/emorr-agy/internal/telegram"
 )
 
-const Version = "0.1.2"
+const Version = "0.1.4"
 
 func main() {
 	// Load environment variables from .env if present
@@ -166,6 +166,22 @@ func main() {
 			os.Exit(1)
 		}
 
+	case "resume":
+		if len(os.Args) < 3 {
+			printUsage()
+			os.Exit(1)
+		}
+		sessionID := os.Args[2]
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting user home dir: %v", err)
+		}
+
+		engine := sessions.NewClassificationEngine(sessions.RealTmuxRunner{}, sessions.OSFileSystem{}, homeDir)
+		if err := sessions.ResumeSession(engine, sessionID); err != nil {
+			log.Fatalf("Error resuming session %q: %v", sessionID, err)
+		}
+
 	default:
 		printUsage()
 		os.Exit(1)
@@ -181,6 +197,7 @@ func printUsage() {
 	fmt.Println("  emorr-agy check                     - Verify tmux installation and mouse settings")
 	fmt.Println("  emorr-agy sessions list [options]   - List active and history sessions")
 	fmt.Println("  emorr-agy sessions show <id> [opts] - Show session details and LLM status")
+	fmt.Println("  emorr-agy resume <id>               - Resume/resuscitate a dead or active session")
 	printFooter()
 }
 

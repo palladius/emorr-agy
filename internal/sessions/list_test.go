@@ -112,3 +112,77 @@ func TestListSessionsFormats(t *testing.T) {
 		}
 	})
 }
+
+func TestFormatStatus(t *testing.T) {
+	tests := []struct {
+		name     string
+		session  Session
+		expected string
+	}{
+		{
+			name: "Open Tmux Attached 1",
+			session: Session{
+				State:           StateOpenTmux,
+				AttachedClients: 1,
+			},
+			expected: "💻",
+		},
+		{
+			name: "Open Tmux Attached 2",
+			session: Session{
+				State:           StateOpenTmux,
+				AttachedClients: 2,
+			},
+			expected: "💻(2)",
+		},
+		{
+			name: "Open Tmux Detached",
+			session: Session{
+				State:           StateOpenTmux,
+				AttachedClients: 0,
+			},
+			expected: "💤",
+		},
+		{
+			name: "Open Private Attached 1",
+			session: Session{
+				State:           StateOpenPrivate,
+				AttachedClients: 1,
+			},
+			expected: "🔒",
+		},
+		{
+			name: "Open Private Attached 3",
+			session: Session{
+				State:           StateOpenPrivate,
+				AttachedClients: 3,
+			},
+			expected: "🔒(3)",
+		},
+		{
+			name: "Open Private Detached",
+			session: Session{
+				State:           StateOpenPrivate,
+				AttachedClients: 0,
+			},
+			expected: "🔒",
+		},
+		{
+			name: "Open Agy",
+			session: Session{
+				State: StateOpenAgy,
+			},
+			expected: "🟢",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := formatStatus(tc.session)
+			if got != tc.expected {
+				t.Errorf("expected %q, got %q", tc.expected, got)
+			}
+		})
+	}
+}
+

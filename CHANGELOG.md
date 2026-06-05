@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-06-05
+
+### Added
+- Parsed and displayed the number of attached clients to tmux sessions.
+- Visual status indicators: detached tmux sessions show as `💤` (asleep/detached) and attached sessions show as `💻` (or `💻(N)` if multiple clients are attached).
+- Added unit tests for the tmux session attachment formatting logic.
+
 ## [0.1.2] - 2026-06-04
 
 ### Added

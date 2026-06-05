@@ -54,7 +54,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			color.Colorize("RESUME COMMAND", color.Plain),
 		)
 		for _, s := range sessions {
-			emoji := getEmojiForState(s.State)
+			emoji := formatStatus(s)
 			harnessEmoji := getEmojiForHarness(s.Harness)
 			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
@@ -87,7 +87,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			color.Colorize("DIRECTORY", color.Plain),
 		)
 		for _, s := range sessions {
-			emoji := getEmojiForState(s.State)
+			emoji := formatStatus(s)
 			harnessEmoji := getEmojiForHarness(s.Harness)
 			age := FormatAge(s.LastActivity)
 			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
@@ -139,6 +139,26 @@ func getEmojiForState(state SessionState) string {
 	default:
 		return "❓"
 	}
+}
+
+func formatStatus(s Session) string {
+	emoji := getEmojiForState(s.State)
+	if s.State == StateOpenTmux {
+		if s.AttachedClients == 0 {
+			return "💤"
+		}
+		if s.AttachedClients > 1 {
+			return fmt.Sprintf("💻(%d)", s.AttachedClients)
+		}
+		return "💻"
+	}
+	if s.State == StateOpenPrivate {
+		if s.AttachedClients > 1 {
+			return fmt.Sprintf("🔒(%d)", s.AttachedClients)
+		}
+		return "🔒"
+	}
+	return emoji
 }
 
 func FormatAge(t time.Time) string {

@@ -22,22 +22,24 @@ const (
 )
 
 type Session struct {
-	ID            string       `json:"id"`
-	Harness       string       `json:"harness"` // "agy", "gemini", "claude", "unknown"
-	State         SessionState `json:"state"`
-	Folder        string       `json:"folder"`
-	Title         string       `json:"title,omitempty"`
-	Description   string       `json:"description,omitempty"`
-	LastActivity  time.Time    `json:"last_activity,omitempty"`
-	ProcessCount  int          `json:"process_count"`
-	ResumeCommand string       `json:"resume_command,omitempty"`
+	ID              string       `json:"id"`
+	Harness         string       `json:"harness"` // "agy", "gemini", "claude", "unknown"
+	State           SessionState `json:"state"`
+	Folder          string       `json:"folder"`
+	Title           string       `json:"title,omitempty"`
+	Description     string       `json:"description,omitempty"`
+	LastActivity    time.Time    `json:"last_activity,omitempty"`
+	ProcessCount    int          `json:"process_count"`
+	ResumeCommand   string       `json:"resume_command,omitempty"`
+	AttachedClients int          `json:"attached_clients"`
 }
 
 type TmuxSession struct {
-	Name     string
-	Path     string
-	Attached bool
-	Windows  int
+	Name            string
+	Path            string
+	Attached        bool
+	AttachedClients int
+	Windows         int
 }
 
 type TmuxRunner interface {
@@ -83,13 +85,15 @@ func (RealTmuxRunner) ListSessions() ([]TmuxSession, error) {
 		}
 		parts := strings.Split(line, "\t")
 		if len(parts) >= 4 {
-			attached := parts[2] == "1"
+			attachedClients, _ := strconv.Atoi(parts[2])
+			attached := attachedClients > 0
 			windows, _ := strconv.Atoi(parts[3])
 			list = append(list, TmuxSession{
-				Name:     parts[0],
-				Path:     parts[1],
-				Attached: attached,
-				Windows:  windows,
+				Name:            parts[0],
+				Path:            parts[1],
+				Attached:        attached,
+				AttachedClients: attachedClients,
+				Windows:         windows,
 			})
 		}
 	}
@@ -154,14 +158,20 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 				}
 			}
 
+			attachedClients := ts.AttachedClients
+			if attachedClients == 0 && ts.Attached {
+				attachedClients = 1
+			}
+
 			s := Session{
-				ID:            ts.Name,
-				Harness:       harness,
-				State:         state,
-				Folder:        ts.Path,
-				ProcessCount:  ts.Windows,
-				LastActivity:  lastActivity,
-				ResumeCommand: "tmux attach -t " + ts.Name,
+				ID:              ts.Name,
+				Harness:         harness,
+				State:           state,
+				Folder:          ts.Path,
+				ProcessCount:    ts.Windows,
+				LastActivity:    lastActivity,
+				ResumeCommand:   "tmux attach -t " + ts.Name,
+				AttachedClients: attachedClients,
 			}
 			sessions = append(sessions, s)
 		}

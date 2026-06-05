@@ -1078,7 +1078,7 @@ func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) er
 
 	if strings.HasPrefix(data, "show:") {
 		sessionID := strings.TrimPrefix(data, "show:")
-		details, opts, err := sessions.GetSessionDetailsAndOptions(homeDir, sessionID)
+		details, opts, isDead, err := sessions.GetSessionDetailsAndOptions(homeDir, sessionID)
 		if err != nil {
 			_ = telegram.EditTelegramMessageText(botToken, chatID, messageID, fmt.Sprintf("Error retrieving details for %s: %v", sessionID, err), "")
 			return err
@@ -1092,10 +1092,7 @@ func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) er
 			})
 		}
 
-		var markup string
-		if len(optButtons) > 0 {
-			markup, _ = telegram.BuildOptionsKeyboard(sessionID, optButtons)
-		}
+		markup, _ := telegram.BuildOptionsAndActionsKeyboard(sessionID, optButtons, isDead)
 
 		_ = telegram.EditTelegramMessageText(botToken, chatID, messageID, details, markup)
 		return nil
@@ -1120,7 +1117,7 @@ func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) er
 		time.Sleep(300 * time.Millisecond)
 
 		// Refresh the message details and options
-		details, opts, err := sessions.GetSessionDetailsAndOptions(homeDir, sessionID)
+		details, opts, isDead, err := sessions.GetSessionDetailsAndOptions(homeDir, sessionID)
 		if err != nil {
 			// If session finished, update message
 			_ = telegram.EditTelegramMessageText(botToken, chatID, messageID, fmt.Sprintf("Session %s finished or became unavailable.", sessionID), "")
@@ -1135,12 +1132,63 @@ func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) er
 			})
 		}
 
-		var markup string
-		if len(optButtons) > 0 {
-			markup, _ = telegram.BuildOptionsKeyboard(sessionID, optButtons)
-		}
+		markup, _ := telegram.BuildOptionsAndActionsKeyboard(sessionID, optButtons, isDead)
 
 		_ = telegram.EditTelegramMessageText(botToken, chatID, messageID, details, markup)
+		return nil
+	}
+
+	if strings.HasPrefix(data, "revive:") {
+		sessionID := strings.TrimPrefix(data, "revive:")
+		
+		_ = telegram.EditTelegramMessageText(botToken, chatID, messageID, fmt.Sprintf("🔄 Resuscitating session %s in background...", sessionID), "")
+		
+		engine := sessions.NewClassificationEngine(sessions.RealTmuxRunner{}, sessions.OSFileSystem{}, homeDir)
+		err := sessions.ResuscitateSession(engine, sessionID)
+		if err != nil {
+			logger.Errorf("Failed to resuscitate session %s: %v", sessionID, err)
+			_ = telegram.EditTelegramMessageText(botToken, chatID, messageID, fmt.Sprintf("⚠️ Failed to resuscitate session %s: %v", sessionID, err), "")
+			return err
+		}
+
+		time.Sleep(500 * time.Millisecond)
+
+		details, opts, isDead, err := sessions.GetSessionDetailsAndOptions(homeDir, sessionID)
+		if err == nil {
+			var optButtons []telegram.OptionButton
+			for _, o := range opts {
+				optButtons = append(optButtons, telegram.OptionButton{
+					ID:   o.ID,
+					Text: o.Text,
+				})
+			}
+			markup, _ := telegram.BuildOptionsAndActionsKeyboard(sessionID, optButtons, isDead)
+			_ = telegram.EditTelegramMessageText(botToken, chatID, messageID, details, markup)
+		} else {
+			_ = telegram.EditTelegramMessageText(botToken, chatID, messageID, fmt.Sprintf("Session %s resuscitated but details currently unavailable.", sessionID), "")
+		}
+		return nil
+	}
+
+	if strings.HasPrefix(data, "archive:") {
+		sessionID := strings.TrimPrefix(data, "archive:")
+		engine := sessions.NewClassificationEngine(sessions.RealTmuxRunner{}, sessions.OSFileSystem{}, homeDir)
+		
+		_ = exec.Command("tmux", "kill-session", "-t", sessionID).Run()
+		if !strings.HasPrefix(sessionID, "emagy-") && !strings.HasPrefix(sessionID, "emgem-") && !strings.HasPrefix(sessionID, "emcld-") {
+			_ = exec.Command("tmux", "kill-session", "-t", "emagy-"+sessionID).Run()
+			_ = exec.Command("tmux", "kill-session", "-t", "emgem-"+sessionID).Run()
+			_ = exec.Command("tmux", "kill-session", "-t", "emcld-"+sessionID).Run()
+		}
+
+		err := sessions.ArchiveSession(engine, sessionID)
+		if err != nil {
+			logger.Errorf("Failed to archive session %s: %v", sessionID, err)
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("⚠️ Failed to archive session %s: %v", sessionID, err))
+			return err
+		}
+
+		_ = telegram.EditTelegramMessageText(botToken, chatID, messageID, fmt.Sprintf("🗄️ Session %s has been successfully archived.", sessionID), "")
 		return nil
 	}
 

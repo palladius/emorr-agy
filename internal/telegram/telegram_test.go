@@ -259,4 +259,29 @@ func TestBuildKeyboards(t *testing.T) {
 	if menuDecoded.InlineKeyboard[2][0].CallbackData != "menu:restart_server" {
 		t.Errorf("expected callback_data 'menu:restart_server', got %q", menuDecoded.InlineKeyboard[2][0].CallbackData)
 	}
+
+	// 4. BuildOptionsAndActionsKeyboard
+	actMarkup, err := BuildOptionsAndActionsKeyboard("emagy-123", optButtons, true)
+	if err != nil {
+		t.Fatalf("BuildOptionsAndActionsKeyboard failed: %v", err)
+	}
+	var actDecoded InlineKeyboardMarkup
+	if err := json.Unmarshal([]byte(actMarkup), &actDecoded); err != nil {
+		t.Fatalf("failed to decode actions markup: %v", err)
+	}
+	// 3 options (2 rows) + 1 action row = 3 rows
+	if len(actDecoded.InlineKeyboard) != 3 {
+		t.Errorf("expected 3 rows, got %d", len(actDecoded.InlineKeyboard))
+	}
+	actionRow := actDecoded.InlineKeyboard[2]
+	if len(actionRow) != 2 {
+		t.Errorf("expected 2 action buttons, got %d", len(actionRow))
+	}
+	if actionRow[0].Text != "🔄 Revive / Resume" || actionRow[0].CallbackData != "revive:emagy-123" {
+		t.Errorf("unexpected revive button: %+v", actionRow[0])
+	}
+	if actionRow[1].Text != "🗄️ Archive" || actionRow[1].CallbackData != "archive:emagy-123" {
+		t.Errorf("unexpected archive button: %+v", actionRow[1])
+	}
 }
+

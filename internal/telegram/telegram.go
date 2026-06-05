@@ -292,6 +292,61 @@ func BuildOptionsKeyboard(sessionID string, options []OptionButton) (string, err
 	return string(data), nil
 }
 
+// BuildOptionsAndActionsKeyboard constructs the inline keyboard markup JSON for choices in a session plus standard actions.
+func BuildOptionsAndActionsKeyboard(sessionID string, options []OptionButton, isDead bool) (string, error) {
+	var keyboard [][]InlineKeyboardButton
+	var row []InlineKeyboardButton
+	for _, opt := range options {
+		// Truncate text if it's too long
+		text := opt.Text
+		if len(text) > 30 {
+			text = text[:27] + "..."
+		}
+		btnText := fmt.Sprintf("%s: %s", opt.ID, text)
+		row = append(row, InlineKeyboardButton{
+			Text:         btnText,
+			CallbackData: fmt.Sprintf("exec:%s:%s", sessionID, opt.ID),
+		})
+		// Put 2 buttons per row for better layout
+		if len(row) == 2 {
+			keyboard = append(keyboard, row)
+			row = []InlineKeyboardButton{}
+		}
+	}
+	if len(row) > 0 {
+		keyboard = append(keyboard, row)
+	}
+
+	// Add actions row
+	var actionRow []InlineKeyboardButton
+	if isDead {
+		actionRow = append(actionRow, InlineKeyboardButton{
+			Text:         "🔄 Revive / Resume",
+			CallbackData: "revive:" + sessionID,
+		})
+		actionRow = append(actionRow, InlineKeyboardButton{
+			Text:         "🗄️ Archive",
+			CallbackData: "archive:" + sessionID,
+		})
+	} else {
+		actionRow = append(actionRow, InlineKeyboardButton{
+			Text:         "🗄️ Archive",
+			CallbackData: "archive:" + sessionID,
+		})
+	}
+	keyboard = append(keyboard, actionRow)
+
+	markup := InlineKeyboardMarkup{
+		InlineKeyboard: keyboard,
+	}
+	data, err := json.Marshal(markup)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+
 // BuildMenuKeyboard constructs the inline keyboard markup JSON for the main menu options.
 func BuildMenuKeyboard() (string, error) {
 	markup := InlineKeyboardMarkup{

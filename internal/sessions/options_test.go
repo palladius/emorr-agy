@@ -45,6 +45,16 @@ func TestParsePaneOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "Yes/No proceed prompt",
+			lines: []string{
+				"This command will remove build directories. Do you want to proceed? [y/n]",
+			},
+			expected: []PaneOption{
+				{ID: "y", Text: "Yes / Approve"},
+				{ID: "n", Text: "No / Deny"},
+			},
+		},
+		{
 			name: "No options present",
 			lines: []string{
 				"Server started successfully on port 8080.",

@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"encoding/json"
 	"os/exec"
 	"testing"
 )
@@ -113,3 +114,74 @@ func TestResumeSession_DeadResuscitate(t *testing.T) {
 		t.Errorf("expected attach to emagy-f0a30f63-d1b1-4ff3-9220-98c410fb17a9, got %q", attachSessionName)
 	}
 }
+
+func TestResuscitateAndArchiveSession(t *testing.T) {
+	mockTmux := &MockTmuxRunner{}
+	mockFS := &MockFileSystem{
+		files: map[string][]byte{
+			"/home/ricc/.gemini/antigravity-cli/cache/last_conversations.json": []byte(`{"/workspace/sre-extension": "f0a30f63-d1b1-4ff3-9220-98c410fb17a9"}`),
+		},
+	}
+	engine := NewClassificationEngine(mockTmux, mockFS, "/home/ricc")
+
+	var newSessionArgs []string
+	var execCalled bool
+
+	origExec := execCommand
+	origSyscall := syscallExec
+	defer func() {
+		execCommand = origExec
+		syscallExec = origSyscall
+	}()
+
+	execCommand = func(name string, arg ...string) *exec.Cmd {
+		execCalled = true
+		newSessionArgs = arg
+		return exec.Command("true")
+	}
+
+	var syscallExecCalled bool
+	syscallExec = func(argv0 string, argv []string, envv []string) error {
+		syscallExecCalled = true
+		return nil
+	}
+
+	// 1. Test ResuscitateSession (should start in background but NOT attach)
+	err := ResuscitateSession(engine, "f0a30f63-d1b1-4ff3-9220-98c410fb17a9")
+	if err != nil {
+		t.Fatalf("unexpected error during resuscitation: %v", err)
+	}
+
+	if !execCalled {
+		t.Error("expected execCommand to be called")
+	}
+	if syscallExecCalled {
+		t.Error("resuscitate should not attach (syscallExec should not be called)")
+	}
+	if len(newSessionArgs) < 7 || newSessionArgs[3] != "emagy-f0a30f63-d1b1-4ff3-9220-98c410fb17a9" {
+		t.Errorf("unexpected resuscitation arguments: %v", newSessionArgs)
+	}
+
+	// 2. Test ArchiveSession
+	err = ArchiveSession(engine, "f0a30f63-d1b1-4ff3-9220-98c410fb17a9")
+	if err != nil {
+		t.Fatalf("unexpected error during archiving: %v", err)
+	}
+
+	// Should have written false worth_resuscitate to cache
+	cachePath := "/home/ricc/.emorr-agy/cache/f0a30f63-d1b1-4ff3-9220-98c410fb17a9.json"
+	writtenData, ok := mockFS.files[cachePath]
+	if !ok {
+		t.Fatal("expected cache file to be written")
+	}
+	var cacheRes struct {
+		WorthResuscitate bool `json:"worth_resuscitate"`
+	}
+	if err := json.Unmarshal(writtenData, &cacheRes); err != nil {
+		t.Fatalf("failed to decode written cache: %v", err)
+	}
+	if cacheRes.WorthResuscitate {
+		t.Error("expected worth_resuscitate to be false")
+	}
+}
+

@@ -417,22 +417,25 @@ func getLatestStepFromDB(dbPath string) (int, int, error) {
 }
 
 // GetSessionDetailsAndOptions returns formatted details of a session, its last 10 lines of tmux pane, and any parsed option choices.
-func GetSessionDetailsAndOptions(homeDir string, sessionID string) (string, []PaneOption, error) {
+func GetSessionDetailsAndOptions(homeDir string, sessionID string) (string, []PaneOption, bool, error) {
 	engine := NewClassificationEngine(RealTmuxRunner{}, OSFileSystem{}, homeDir)
 	sessions, err := engine.Classify(nil)
 	if err != nil {
-		return "", nil, err
+		return "", nil, false, err
 	}
 
 	var target *Session
 	for i := range sessions {
-		if sessions[i].ID == sessionID {
+		if sessions[i].ID == sessionID ||
+			strings.TrimPrefix(sessions[i].ID, "emagy-") == sessionID ||
+			strings.TrimPrefix(sessions[i].ID, "emgem-") == sessionID ||
+			strings.TrimPrefix(sessions[i].ID, "emcld-") == sessionID {
 			target = &sessions[i]
 			break
 		}
 	}
 	if target == nil {
-		return "", nil, fmt.Errorf("session %q not found", sessionID)
+		return "", nil, false, fmt.Errorf("session %q not found", sessionID)
 	}
 
 	trimmedID := target.ID
@@ -488,9 +491,11 @@ func GetSessionDetailsAndOptions(homeDir string, sessionID string) (string, []Pa
 		}
 		// Parse options from these captured lines
 		opts := ParsePaneOptions(outputLines)
-		return sb.String(), opts, nil
+		isDead := target.State == StateDeadResuscitatable || target.State == StateDeadArchived
+		return sb.String(), opts, isDead, nil
 	}
 
 	sb.WriteString("(no active tmux output or pane exited)\n")
-	return sb.String(), nil, nil
+	isDead := target.State == StateDeadResuscitatable || target.State == StateDeadArchived
+	return sb.String(), nil, isDead, nil
 }

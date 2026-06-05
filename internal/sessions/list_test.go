@@ -21,6 +21,9 @@ func TestListSessionsFormats(t *testing.T) {
 				"/workspace/proj3": "session-Chumbia",
 				"/workspace/proj4": "session-dead-active"
 			}`),
+			"/home/ricc/.emorr-agy/cache/session-1.json": []byte(`{
+				"about": "This is a super long description that is definitely longer than thirty characters"
+			}`),
 		},
 	}
 
@@ -43,6 +46,9 @@ func TestListSessionsFormats(t *testing.T) {
 		}
 		if !strings.Contains(output, "💻") || !strings.Contains(output, "emagy-session-1") || !strings.Contains(output, "/workspace/p...") {
 			t.Errorf("missing open tmux session details in short format: %q", output)
+		}
+		if !strings.Contains(output, "This is a super long descri...") {
+			t.Errorf("missing truncated description in short format: %q", output)
 		}
 		if !strings.Contains(output, "🔒") || !strings.Contains(output, "my-private-session") {
 			t.Errorf("missing private session details in short format: %q", output)

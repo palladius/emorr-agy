@@ -86,6 +86,9 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 			desc := strings.TrimSpace(s.Description)
 			desc = strings.ReplaceAll(desc, "\n", " ")
+			if len(desc) > 30 {
+				desc = desc[:27] + "..."
+			}
 
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				color.Colorize(emoji, color.Plain),
@@ -132,6 +135,9 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 			desc := strings.TrimSpace(s.Description)
 			desc = strings.ReplaceAll(desc, "\n", " ")
+			if len(desc) > 30 {
+				desc = desc[:27] + "..."
+			}
 
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
 				color.Colorize(emoji, color.Plain),

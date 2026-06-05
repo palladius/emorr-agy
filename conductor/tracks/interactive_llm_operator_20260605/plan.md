@@ -1,21 +1,24 @@
 # Implementation Plan: Telegram Buttons, LLM Operator, and MCP Sandboxing
 
-## Phase 1: MCP Sandboxing Layer
-- [ ] Task 1.1: Write unit tests verifying the MCP client connection, shell command execution routing, and error handling.
-- [ ] Task 1.2: Implement the MCP client connector in `internal/mcp/client.go` with fallback mock capabilities.
-- [ ] Task 1.3: Conductor - User Manual Verification 'Phase 1: MCP Sandboxing Layer' (Protocol in workflow.md)
+## Phase 1: Telegram Button Controls & Option Extraction
+- [x] Task 1.1: Enhance `ParsePaneOptions` in `internal/sessions/options.go` to detect yes/no prompts (`(y/n)`, `[y/n]`, `proceed?`) in tmux terminal lines and yield `y` and `n` as options. (247868b)
+- [x] Task 1.2: Write unit tests verifying yes/no option detection and standard session buttons layout. (247868b)
+- [x] Task 1.3: Update Telegram message details response in `main.go` to display standard action buttons (Archive for active, Revive for dead) alongside option choices. (247868b)
+- [ ] Task 1.4: Conductor - User Manual Verification 'Phase 1: Telegram Button Controls & Option Extraction' (Protocol in workflow.md)
 
-## Phase 2: Telegram Button Controls
-- [ ] Task 2.1: Write unit tests for the button layout helper and callback routing for Show, Resume, Revive, and Archive.
-- [ ] Task 2.2: Implement inline button generation in `/list` and `/listall` outputs, and implement callback routing in `main.go`.
-- [ ] Task 2.3: Conductor - User Manual Verification 'Phase 2: Telegram Button Controls' (Protocol in workflow.md)
+## Phase 2: Session Revival & Callback Routing
+- [x] Task 2.1: Implement callback routing in `main.go` for the `revive:<session_id>` action, which invokes `ResumeSession` to spawn the session in its correct folder. (247868b)
+- [x] Task 2.2: Implement the `archive:<session_id>` callback action to archive active/dead sessions. (247868b)
+- [x] Task 2.3: Write unit tests for callback action execution and directory routing during resuscitation. (247868b)
+- [ ] Task 2.4: Conductor - User Manual Verification 'Phase 2: Session Revival & Callback Routing' (Protocol in workflow.md)
 
 ## Phase 3: LLM Operator ("Cindy") Command
 - [ ] Task 3.1: Write unit tests verifying `/ask` parsing, loading the system prompt from `etc/prompts/cindy.txt`, and resolving intents.
 - [ ] Task 3.2: Implement the `/ask` command handler and template loader in `internal/operator/cindy.go`.
 - [ ] Task 3.3: Conductor - User Manual Verification 'Phase 3: LLM Operator ("Cindy") Command' (Protocol in workflow.md)
 
-## Phase 4: Integration & Verification
-- [ ] Task 4.1: Integrate all components into the root `main.go` bot server daemon.
-- [ ] Task 4.2: Verify compilation (`just build`), run the full test suite, and verify >80% coverage.
-- [ ] Task 4.3: Conductor - User Manual Verification 'Phase 4: Integration & Verification' (Protocol in workflow.md)
+## Phase 4: MCP Sandboxing Layer & Final Verification
+- [ ] Task 4.1: Write unit tests verifying the MCP client connection, shell command execution routing, and error handling.
+- [ ] Task 4.2: Implement the MCP client connector in `internal/mcp/client.go` with fallback mock capabilities.
+- [ ] Task 4.3: Integrate all components, verify compilation (`just build`), run the full test suite, and verify >80% coverage.
+- [ ] Task 4.4: Conductor - User Manual Verification 'Phase 4: MCP Sandboxing Layer & Final Verification' (Protocol in workflow.md)

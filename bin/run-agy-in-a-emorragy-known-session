@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Wrapper script to run a harness inside a tmux session known to emorr-agy.
+# This registers the session with the Telegram bot server.
+
+set -euo pipefail
+
+# Check if tmux is installed
+if ! command -v tmux &>/dev/null; then
+    echo "Error: tmux is required but not installed." >&2
+    exit 1
+fi
+
+# Default harness is agy
+HARNESS="agy"
+# Default prefix is emagy-
+PREFIX="emagy-"
+
+# Check if the first argument is a known harness type
+if [ $# -gt 0 ]; then
+    case "${1}" in
+        agy)
+            HARNESS="agy"
+            PREFIX="emagy-"
+            shift
+            ;;
+        gemini)
+            HARNESS="gemini"
+            PREFIX="emgem-"
+            shift
+            ;;
+        claude)
+            HARNESS="claude"
+            PREFIX="emcld-"
+            shift
+            ;;
+    esac
+fi
+
+# Generate session name with timestamp in standard format: YYMMDD-HHMMSS
+TIMESTAMP=$(date +"%y%m%d-%H%M%S")
+SESSION_NAME="${PREFIX}${TIMESTAMP}"
+
+echo "🚀 Launching harness '${HARNESS}' in a known emorr-agy tmux session: ${SESSION_NAME}"
+echo "Use 'Ctrl+B' then 'D' to detach, or exit the harness to close the session."
+
+# Start tmux session and run the harness, passing any remaining arguments
+exec tmux new-session -s "${SESSION_NAME}" "${HARNESS}" "$@"

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Short alias script for run-agy-in-a-emorragy-known-session
+exec "$(dirname "$0")/run-agy-in-a-emorragy-known-session" "$@"

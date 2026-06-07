@@ -126,6 +126,28 @@ Verifies that `tmux` is installed on the system and inspects the user's `~/.tmux
 
 ---
 
+### 6. Script Wrappers (e.g. `emagy-run`)
+
+To run a harness (`agy`, `gemini`, or `claude`) inside a tmux session that is automatically tracked and registered with the Telegram bot server, you can use the wrapper script.
+
+* **Usage**:
+  ```bash
+  ./bin/run-agy-in-a-emorragy-known-session [harness] [arguments...]
+  # or using the short alias:
+  ./bin/emagy-run [harness] [arguments...]
+  ```
+* **Examples**:
+  ```bash
+  # Start a standard 'agy' session with arguments:
+  ./bin/emagy-run agy write a hello world script
+  
+  # Start 'gemini' session:
+  ./bin/emagy-run gemini write a go test
+  ```
+This starts the tmux session with the proper bot-recognizable prefix (e.g. `emgem-260607-135736`) and runs the harness. When the bot lists or monitors sessions, this session will show up in the Telegram interface.
+
+---
+
 ## Configuration & Environment Variables
 
 The CLI reads configuration from the environment, supporting standard `.env` file loading on startup.

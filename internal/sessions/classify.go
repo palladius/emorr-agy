@@ -301,6 +301,8 @@ func (c *ClassificationEngine) FindActiveConvs() map[string]int {
 		return active
 	}
 
+	candidates := []string{"agy", "gemini", "claude", "emorr-agy", "python", "python3", "node", "go", "bash", "sh"}
+
 	for _, file := range files {
 		if !file.IsDir() {
 			continue
@@ -308,6 +310,25 @@ func (c *ClassificationEngine) FindActiveConvs() map[string]int {
 		pidStr := file.Name()
 		pid, err := strconv.Atoi(pidStr)
 		if err != nil {
+			continue
+		}
+
+		// Read comm first to pre-filter
+		commPath := filepath.Join("/proc", pidStr, "comm")
+		commBytes, err := c.fs.ReadFile(commPath)
+		if err != nil {
+			continue
+		}
+		procName := strings.TrimSpace(string(commBytes))
+
+		isCandidate := false
+		for _, cand := range candidates {
+			if strings.Contains(procName, cand) {
+				isCandidate = true
+				break
+			}
+		}
+		if !isCandidate {
 			continue
 		}
 

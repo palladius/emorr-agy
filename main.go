@@ -89,7 +89,7 @@ func main() {
 			fs := flag.NewFlagSet("sessions list", flag.ExitOnError)
 			var harnessFlag string
 			var jsonFlag, longFlag, shortFlag bool
-			var allFlag bool
+			var allFlag, activeFlag bool
 
 			fs.StringVar(&harnessFlag, "harness", "", "Filter by harness type (comma-separated list, e.g. agy,gemini)")
 			fs.BoolVar(&jsonFlag, "json", false, "JSON output format")
@@ -97,6 +97,7 @@ func main() {
 			fs.BoolVar(&shortFlag, "short", false, "Short tabular output format (default)")
 			fs.BoolVar(&allFlag, "all", false, "Include archived sessions")
 			fs.BoolVar(&allFlag, "a", false, "Include archived sessions (shorthand)")
+			fs.BoolVar(&activeFlag, "active", false, "Show only active/running sessions")
 
 			_ = fs.Parse(os.Args[3:])
 
@@ -119,9 +120,10 @@ func main() {
 
 			engine := sessions.NewClassificationEngine(sessions.RealTmuxRunner{}, sessions.OSFileSystem{}, homeDir)
 			opts := sessions.ListOptions{
-				Harness: harnesses,
-				Format:  format,
-				All:     allFlag,
+				Harness:    harnesses,
+				Format:     format,
+				All:        allFlag,
+				ActiveOnly: activeFlag,
 			}
 			if err := sessions.ListSessions(os.Stdout, engine, opts); err != nil {
 				log.Fatalf("Error listing sessions: %v", err)
@@ -182,6 +184,16 @@ func main() {
 			log.Fatalf("Error resuming session %q: %v", sessionID, err)
 		}
 
+	case "ps":
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting user home dir: %v", err)
+		}
+		engine := sessions.NewClassificationEngine(sessions.RealTmuxRunner{}, sessions.OSFileSystem{}, homeDir)
+		if err := sessions.PrintProcessStatus(os.Stdout, engine); err != nil {
+			log.Fatalf("Error listing process status: %v", err)
+		}
+
 	default:
 		printUsage()
 		os.Exit(1)
@@ -198,6 +210,7 @@ func printUsage() {
 	fmt.Println("  emorr-agy sessions list [options]   - List active and history sessions")
 	fmt.Println("  emorr-agy sessions show <id> [opts] - Show session details and LLM status")
 	fmt.Println("  emorr-agy resume <id>               - Resume/resuscitate a dead or active session")
+	fmt.Println("  emorr-agy ps                        - Show active harness processes, CWD, and dynamic status")
 	printFooter()
 }
 

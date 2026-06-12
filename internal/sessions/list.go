@@ -13,9 +13,10 @@ import (
 )
 
 type ListOptions struct {
-	Harness []string
-	Format  string // "short", "long", "json"
-	All     bool   // If false, exclude archived sessions
+	Harness    []string
+	Format     string // "short", "long", "json"
+	All        bool   // If false, exclude archived sessions
+	ActiveOnly bool   // If true, show only active/running sessions
 }
 
 // ListSessions retrieves and prints the classified sessions to the provided writer.
@@ -25,7 +26,15 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		return err
 	}
 
-	if !opts.All {
+	if opts.ActiveOnly {
+		var filtered []Session
+		for _, s := range sessions {
+			if s.State == StateOpenTmux || s.State == StateOpenAgy || s.State == StateOpenPrivate {
+				filtered = append(filtered, s)
+			}
+		}
+		sessions = filtered
+	} else if !opts.All {
 		var filtered []Session
 		for _, s := range sessions {
 			if s.State != StateDeadArchived {

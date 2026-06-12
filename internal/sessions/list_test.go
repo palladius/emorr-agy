@@ -134,6 +134,29 @@ func TestListSessionsFormats(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("ActiveOnly Option", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := ListSessions(&buf, engine, ListOptions{Format: "json", ActiveOnly: true})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		var sessionsList []Session
+		if err := json.Unmarshal(buf.Bytes(), &sessionsList); err != nil {
+			t.Fatalf("failed to parse JSON output: %v", err)
+		}
+
+		// Only open sessions: emagy-session-1 (open_tmux) and my-private-session (open_private)
+		if len(sessionsList) != 2 {
+			t.Errorf("expected 2 active sessions, got %d", len(sessionsList))
+		}
+		for _, s := range sessionsList {
+			if s.State != StateOpenTmux && s.State != StateOpenAgy && s.State != StateOpenPrivate {
+				t.Errorf("expected only open states, got %s for session %s", s.State, s.ID)
+			}
+		}
+	})
 }
 
 func TestFormatStatus(t *testing.T) {

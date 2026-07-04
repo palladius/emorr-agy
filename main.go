@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -50,9 +49,58 @@ func main() {
 		fmt.Println("🎉 Message sent successfully to Telegram!")
 
 	case "monitor":
-		err := runMonitor()
-		if err != nil {
-			log.Fatalf("Error running monitor: %v", err)
+		// Parse flags
+		watchMode := false
+		onlyOpen := false
+		jsonFormat := false
+		sendToTelegram := false
+		inspectConvID := ""
+		folderFilter := ""
+
+		for i := 2; i < len(os.Args); i++ {
+			arg := os.Args[i]
+			switch arg {
+			case "--watch", "-w", "watch":
+				watchMode = true
+			case "--open", "-o", "open":
+				onlyOpen = true
+			case "--json", "-j", "json":
+				jsonFormat = true
+			case "--telegram", "-t", "telegram":
+				sendToTelegram = true
+			case "--folder", "-f", "folder":
+				if i+1 < len(os.Args) {
+					folderFilter = os.Args[i+1]
+					i++
+				} else {
+					log.Fatalf("Error: --folder/-f requires a directory path")
+				}
+			case "info", "inspect", "show":
+				if i+1 < len(os.Args) {
+					inspectConvID = os.Args[i+1]
+					i++
+				} else {
+					log.Fatalf("Error: 'inspect' requires a conversation ID argument")
+				}
+			default:
+				if !strings.HasPrefix(arg, "-") && inspectConvID == "" {
+					inspectConvID = arg
+				} else {
+					fmt.Printf("Warning: unknown argument %s\n", arg)
+				}
+			}
+		}
+
+		if inspectConvID != "" {
+			err := runInspect(inspectConvID)
+			if err != nil {
+				log.Fatalf("Error inspecting thread: %v", err)
+			}
+		} else {
+			err := runMonitor(watchMode, onlyOpen, jsonFormat, sendToTelegram, folderFilter)
+			if err != nil {
+				log.Fatalf("Error running monitor: %v", err)
+			}
 		}
 
 	case "status":
@@ -203,7 +251,8 @@ func main() {
 func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  emorr-agy telegram send <message>   - Send a message to Telegram")
-	fmt.Println("  emorr-agy monitor                   - Monitor active agy threads with emojis")
+	fmt.Println("  emorr-agy monitor [flags]           - Monitor active agy threads with emojis")
+	fmt.Println("  emorr-agy monitor inspect <convID>  - Inspect a specific session in detail")
 	fmt.Println("  emorr-agy status                    - Show status of system, tmux, and threads")
 	fmt.Println("  emorr-agy server                    - Run the Telegram bot daemon receiver")
 	fmt.Println("  emorr-agy check                     - Verify tmux installation and mouse settings")
@@ -211,6 +260,12 @@ func printUsage() {
 	fmt.Println("  emorr-agy sessions show <id> [opts] - Show session details and LLM status")
 	fmt.Println("  emorr-agy resume <id>               - Resume/resuscitate a dead or active session")
 	fmt.Println("  emorr-agy ps                        - Show active harness processes, CWD, and dynamic status")
+	fmt.Println("\nMonitor Flags:")
+	fmt.Println("  --watch, -w, watch        - Enable continuous live watch mode")
+	fmt.Println("  --open, -o, open          - Show only active/open sessions")
+	fmt.Println("  --json, -j, json          - Output thread information in JSON format")
+	fmt.Println("  --telegram, -t, telegram  - Send current monitor status report to Telegram")
+	fmt.Println("  --folder, -f, folder       - Filter by directory path (relative or absolute)")
 	printFooter()
 }
 
@@ -251,26 +306,30 @@ func cleanValue(s string) string {
 // --- Monitor Subcommand Logic ---
 
 type ThreadInfo struct {
-	ConvID       string
-	Dir          string
-	IsOpen       bool
-	PID          int
-	LastActivity time.Time
+	ConvID       string    `json:"conv_id"`
+	Dir          string    `json:"dir"`
+	IsOpen       bool      `json:"is_open"`
+	PID          int       `json:"pid,omitempty"`
+	LastActivity time.Time `json:"-"`
+	StepCount    int       `json:"step_count,omitempty"`
+	StateDetail  string    `json:"state_detail"`
+	StateEmoji   string    `json:"state_emoji"`
+	LastActive   string    `json:"last_active"`
+	Description  string    `json:"description,omitempty"`
 }
 
-func runMonitor() error {
+func fetchThreads(cliPath string, onlyOpen bool, folderFilter string) ([]*ThreadInfo, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return fmt.Errorf("failed to get user home dir: %w", err)
+		return nil, fmt.Errorf("failed to get user home dir: %w", err)
 	}
 
-	cliPath := filepath.Join(homeDir, ".gemini/antigravity-cli")
 	cacheFile := filepath.Join(cliPath, "cache/last_conversations.json")
 
 	// 1. Discover open conversations by inspecting /proc filesystem
 	openConvs, err := findOpenConversations(cliPath)
 	if err != nil {
-		return fmt.Errorf("failed to inspect active processes: %w", err)
+		return nil, fmt.Errorf("failed to inspect active processes: %w", err)
 	}
 
 	// 2. Read historical conversations map from cache
@@ -283,7 +342,7 @@ func runMonitor() error {
 	// 3. Build process tree to check for active child processes
 	processTree, err := buildProcessTree()
 	if err != nil {
-		return fmt.Errorf("failed to build process tree: %w", err)
+		return nil, fmt.Errorf("failed to build process tree: %w", err)
 	}
 
 	// 4. Merge historical and active conversations
@@ -305,6 +364,8 @@ func runMonitor() error {
 			Dir:          dir,
 			IsOpen:       false,
 			LastActivity: lastActivity,
+			StateDetail:  "Closed",
+			StateEmoji:   "⚫",
 		}
 	}
 
@@ -335,9 +396,89 @@ func runMonitor() error {
 		}
 	}
 
-	// Sort by last activity mod time descending
+	// Resolve path, expand ~ for folder filter
+	var absFilter string
+	if folderFilter != "" {
+		path := folderFilter
+		if strings.HasPrefix(path, "~") {
+			path = filepath.Join(homeDir, path[1:])
+		}
+		abs, err := filepath.Abs(path)
+		if err == nil {
+			absFilter = abs
+		} else {
+			absFilter = path
+		}
+	}
+
+	// Fill in details for all threads
+	for _, thread := range merged {
+		thread.Description = getTranscriptDescription(homeDir, thread.ConvID)
+		dbPath := filepath.Join(cliPath, "conversations", thread.ConvID+".db")
+
+		// Fill in last active time using file modification time
+		fi, err := os.Stat(dbPath)
+		if err == nil {
+			diff := time.Since(fi.ModTime())
+			if diff < time.Second*5 {
+				thread.LastActive = "just now"
+			} else if diff < time.Minute {
+				thread.LastActive = fmt.Sprintf("%ds ago", int(diff.Seconds()))
+			} else if diff < time.Hour {
+				thread.LastActive = fmt.Sprintf("%dm ago", int(diff.Minutes()))
+			} else {
+				thread.LastActive = fmt.Sprintf("%dh ago", int(diff.Hours()))
+			}
+		} else {
+			thread.LastActive = "unknown"
+		}
+
+		if !thread.IsOpen {
+			continue
+		}
+
+		// Conversation is open, infer detailed state and step count
+		stateEmoji := "✍️"
+		stateDetail := "Gemini Writing"
+		stepIdx := 0
+
+		// A. Check for child processes (Tool Calling/IO)
+		if children := processTree[thread.PID]; len(children) > 0 {
+			stateEmoji = "🛠️"
+			stateDetail = "Tool Calling / IO"
+		}
+
+		// B. Check SQLite DB for latest step status
+		idx, stepType, status, err := getLatestStep(dbPath)
+		if err == nil {
+			stepIdx = idx
+			if stateDetail != "Tool Calling / IO" {
+				if status == 3 { // Done
+					stateEmoji = "💬"
+					stateDetail = "Waiting on User"
+				} else if stepType > 0 {
+					stateEmoji = "🛠️"
+					stateDetail = "Running Tool"
+				}
+			}
+		}
+
+		thread.StepCount = stepIdx
+		thread.StateEmoji = stateEmoji
+		thread.StateDetail = stateDetail
+	}
+
+	// Sort by status (Open first) and then directory
 	var threads []*ThreadInfo
 	for _, thread := range merged {
+		if onlyOpen && !thread.IsOpen {
+			continue
+		}
+		if folderFilter != "" {
+			if !isPathMatch(thread.Dir, absFilter) {
+				continue
+			}
+		}
 		threads = append(threads, thread)
 	}
 	sort.Slice(threads, func(i, j int) bool {
@@ -347,18 +488,94 @@ func runMonitor() error {
 		return threads[i].LastActivity.After(threads[j].LastActivity)
 	})
 
-	// 5. Output the status list in tabular way
+	return threads, nil
+}
+
+func isPathMatch(dir, filter string) bool {
+	if filter == "" {
+		return true
+	}
+	dir = filepath.Clean(dir)
+	filter = filepath.Clean(filter)
+
+	if dir == filter {
+		return true
+	}
+
+	sep := string(filepath.Separator)
+	if !strings.HasSuffix(filter, sep) {
+		filter += sep
+	}
+	return strings.HasPrefix(dir, filter)
+}
+
+func runMonitor(watchMode, onlyOpen, jsonFormat, sendToTelegram bool, folderFilter string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get user home dir: %w", err)
+	}
+
+	cliPath := filepath.Join(homeDir, ".gemini/antigravity-cli")
+
+	if watchMode {
+		for {
+			// Clear screen
+			fmt.Print("\033[H\033[2J")
+
+			// Get current time
+			nowStr := time.Now().Format("15:04:05")
+			fmt.Printf("📡 Antigravity (agy) Thread Monitor (watching, Ctrl+C to exit) - %s\n", nowStr)
+			fmt.Println("--------------------------------------------------------------------------------")
+
+			threads, err := fetchThreads(cliPath, onlyOpen, folderFilter)
+			if err != nil {
+				fmt.Printf("Error fetching threads: %v\n", err)
+			} else {
+				printThreadTable(threads)
+			}
+
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	threads, err := fetchThreads(cliPath, onlyOpen, folderFilter)
+	if err != nil {
+		return err
+	}
+
+	if jsonFormat {
+		jsonData, err := json.MarshalIndent(threads, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal threads to JSON: %w", err)
+		}
+		fmt.Println(string(jsonData))
+		return nil
+	}
+
+	if sendToTelegram {
+		return sendMonitorToTelegram(threads)
+	}
+
+	// Default printed format
 	fmt.Println("📡 Antigravity (agy) Thread Monitor:")
 	fmt.Println("--------------------------------------------------------------------------------")
+	printThreadTable(threads)
+	return nil
+}
 
-	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-		color.Colorize("STATUS", color.Plain),
-		color.Colorize("SESSION ID", color.Plain),
-		color.Colorize("AGE", color.Plain),
-		color.Colorize("STATE", color.Plain),
-		color.Colorize("DIRECTORY", color.Plain),
+func printThreadTable(threads []*ThreadInfo) {
+	// Header
+	fmt.Printf("%-4s%-12s%-6s%-24s%-30s%s\n",
+		"ST",
+		"SESSION ID",
+		"AGE",
+		"STATE",
+		"DIRECTORY",
+		"DESCRIPTION",
 	)
+	fmt.Println(strings.Repeat("-", 120))
+
+	homeDir, _ := os.UserHomeDir()
 
 	for _, thread := range threads {
 		shortID := thread.ConvID
@@ -366,53 +583,256 @@ func runMonitor() error {
 			shortID = shortID[:8]
 		}
 
-		folder := strings.ReplaceAll(thread.Dir, "/usr/local/google/home/ricc", "~")
-		age := sessions.FormatAge(thread.LastActivity)
+		// Visible fields
+		statusVal := "⚫"
+		statusColor := color.Plain
+		if thread.IsOpen {
+			statusVal = "🟢"
+		}
 
+		age := sessions.FormatAge(thread.LastActivity)
 		ageColor := color.LightGray
 		if strings.Contains(age, "d") || age == "n/a" {
 			ageColor = color.DarkGray
 		}
 
-		if !thread.IsOpen {
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-				color.Colorize("⚫", color.Plain),
-				color.Colorize(shortID, color.BoldWhite),
-				color.Colorize(age, ageColor),
-				color.Colorize("CLOSED", color.Plain),
-				color.Colorize(folder, color.Blue),
-			)
-			continue
-		}
-
-		// Conversation is open (🟢), now infer detailed state
-		dbPath := filepath.Join(cliPath, "conversations", thread.ConvID+".db")
-		stateDetail := "WRITING"
-
-		// A. Check for child processes (Tool Calling/IO)
-		if children := processTree[thread.PID]; len(children) > 0 {
-			stateDetail = "TOOL"
-		} else {
-			// B. Check SQLite DB for latest step status
-			stepType, status, err := getLatestStep(dbPath)
-			if err == nil {
-				if status == 3 { // Done
-					stateDetail = "USER"
-				} else if stepType > 0 { // Any tool step type in progress
-					stateDetail = "TOOL"
-				}
+		stateText := "CLOSED"
+		if thread.IsOpen {
+			stepStr := ""
+			if thread.StepCount > 0 {
+				stepStr = fmt.Sprintf(" [Step %d]", thread.StepCount)
 			}
+			stateText = fmt.Sprintf("%s %s%s", thread.StateDetail, thread.StateEmoji, stepStr)
 		}
 
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-			color.Colorize("🟢", color.Plain),
-			color.Colorize(shortID, color.BoldWhite),
-			color.Colorize(age, ageColor),
-			color.Colorize(stateDetail, color.Plain),
-			color.Colorize(folder, color.Blue),
+		folder := strings.ReplaceAll(thread.Dir, "/usr/local/google/home/ricc", "~")
+		// Clean and truncate folder to 28 chars
+		displayFolder := folder
+		if len(displayFolder) > 28 {
+			displayFolder = displayFolder[:25] + "..."
+		}
+
+		desc := thread.Description
+		if len(desc) > 60 {
+			desc = desc[:57] + "..."
+		}
+
+		// Pad visible fields to their column widths
+		colStatus := padRight(statusVal, 4)
+		colID := padRight(shortID, 12)
+		colAge := padRight(age, 6)
+		colState := padRight(stateText, 24)
+		colFolder := padRight(displayFolder, 30)
+
+		// Colorize/hyperlink the padded strings
+		colorStatus := color.Colorize(colStatus, statusColor)
+
+		var colorID string
+		if color.ShouldColor() {
+			trimmedID := thread.ConvID
+			if strings.HasPrefix(thread.ConvID, "emagy-") {
+				trimmedID = strings.TrimPrefix(thread.ConvID, "emagy-")
+			} else if strings.HasPrefix(thread.ConvID, "emgem-") {
+				trimmedID = strings.TrimPrefix(thread.ConvID, "emgem-")
+			} else if strings.HasPrefix(thread.ConvID, "emcld-") {
+				trimmedID = strings.TrimPrefix(thread.ConvID, "emcld-")
+			}
+			brainPath := filepath.Join(homeDir, ".gemini/antigravity-cli/brain", trimmedID)
+			url := "file://" + brainPath
+			hyperlink := fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", url, colID)
+			colorID = color.Colorize(hyperlink, color.BoldWhite)
+		} else {
+			colorID = color.Colorize(colID, color.BoldWhite)
+		}
+
+		colorAge := color.Colorize(colAge, ageColor)
+		colorState := color.Colorize(colState, color.Plain)
+		colorFolder := color.Colorize(colFolder, color.Blue)
+		colorDesc := color.Colorize(desc, color.Cyan)
+
+		fmt.Printf("%s%s%s%s%s%s\n",
+			colorStatus,
+			colorID,
+			colorAge,
+			colorState,
+			colorFolder,
+			colorDesc,
 		)
 	}
-	tw.Flush()
+}
+
+// padRight pads a string with spaces on the right to reach the target width.
+// It handles multi-byte characters (like emojis) by counting visual columns.
+func padRight(s string, width int) string {
+	runes := []rune(s)
+	visualWidth := 0
+	for _, r := range runes {
+		// Emojis typically take 2 terminal cells
+		if r == '🟢' || r == '⚫' || r == '🛠' || r == '💬' || r == '✍' || r == '♊' || r == '🇫' || r == '🇷' || r == '❓' || r == '💤' || r == '💻' || r == '🔒' {
+			visualWidth += 2
+		} else {
+			visualWidth += 1
+		}
+	}
+	if visualWidth >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-visualWidth)
+}
+
+func getTranscriptDescription(homeDir, sessionID string) string {
+	trimmedID := sessionID
+	if strings.HasPrefix(sessionID, "emagy-") {
+		trimmedID = strings.TrimPrefix(sessionID, "emagy-")
+	} else if strings.HasPrefix(sessionID, "emgem-") {
+		trimmedID = strings.TrimPrefix(sessionID, "emgem-")
+	} else if strings.HasPrefix(sessionID, "emcld-") {
+		trimmedID = strings.TrimPrefix(sessionID, "emcld-")
+	}
+
+	paths := []string{
+		filepath.Join(homeDir, ".gemini/antigravity-cli/brain", trimmedID, ".system_generated/logs/transcript.jsonl"),
+		filepath.Join(homeDir, ".gemini/antigravity-cli/brain", trimmedID, ".system_generated/logs/transcript_full.jsonl"),
+		filepath.Join(homeDir, ".gemini/antigravity-cli/brain", sessionID, ".system_generated/logs/transcript.jsonl"),
+		filepath.Join(homeDir, ".gemini/antigravity-cli/brain", sessionID, ".system_generated/logs/transcript_full.jsonl"),
+	}
+
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		lines := strings.SplitN(string(data), "\n", 2)
+		if len(lines) == 0 || lines[0] == "" {
+			continue
+		}
+		var step struct {
+			Source  string `json:"source"`
+			Type    string `json:"type"`
+			Content string `json:"content"`
+		}
+		if err := json.Unmarshal([]byte(lines[0]), &step); err == nil {
+			if (step.Type == "USER_INPUT" || step.Source == "USER_EXPLICIT") && step.Content != "" {
+				content := step.Content
+				if startIdx := strings.Index(content, "<USER_REQUEST>"); startIdx != -1 {
+					content = content[startIdx+len("<USER_REQUEST>"):]
+					if endIdx := strings.Index(content, "</USER_REQUEST>"); endIdx != -1 {
+						content = content[:endIdx]
+					}
+				}
+				content = strings.TrimSpace(content)
+				content = strings.ReplaceAll(content, "\n", " ")
+				if len(content) > 120 {
+					content = content[:117] + "..."
+				}
+				return content
+			}
+		}
+	}
+	return ""
+}
+
+func sendMonitorToTelegram(threads []*ThreadInfo) error {
+	var sb strings.Builder
+	sb.WriteString("📡 *Antigravity Thread Monitor Report*\n")
+	sb.WriteString("----------------------------------------\n\n")
+
+	openCount := 0
+	for _, t := range threads {
+		shortID := t.ConvID
+		if len(shortID) > 8 {
+			shortID = shortID[:8]
+		}
+
+		statusStr := "Closed ⚫"
+		if t.IsOpen {
+			openCount++
+			statusStr = fmt.Sprintf("%s %s", t.StateDetail, t.StateEmoji)
+		}
+
+		emoji := "⚫"
+		if t.IsOpen {
+			emoji = "🟢"
+		}
+
+		sb.WriteString(fmt.Sprintf("%s *%s* - `%s`\n", emoji, shortID, t.Dir))
+		if t.IsOpen {
+			sb.WriteString(fmt.Sprintf("  ↳ *Status*: %s\n", statusStr))
+			if t.StepCount > 0 {
+				sb.WriteString(fmt.Sprintf("  ↳ *Steps*: %d | *Active*: %s\n", t.StepCount, t.LastActive))
+			} else {
+				sb.WriteString(fmt.Sprintf("  ↳ *Active*: %s\n", t.LastActive))
+			}
+		} else {
+			sb.WriteString(fmt.Sprintf("  ↳ *Status*: Closed ⚫ | *Last Active*: %s\n", t.LastActive))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString(fmt.Sprintf("📊 *Summary*: %d Active Sessions\n", openCount))
+	sb.WriteString(fmt.Sprintf("🕒 _Report generated at: %s_", time.Now().Format("2006-01-02 15:04:05")))
+
+	return telegram.SendTelegramMessage(sb.String())
+}
+
+func runInspect(convID string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get user home dir: %w", err)
+	}
+
+	cliPath := filepath.Join(homeDir, ".gemini/antigravity-cli")
+	convsDir := filepath.Join(cliPath, "conversations")
+
+	// Find the matching db file (either exact match or prefix match)
+	var dbPath string
+	var fullConvID string
+
+	files, err := os.ReadDir(convsDir)
+	if err != nil {
+		return fmt.Errorf("failed to read conversations directory: %w", err)
+	}
+
+	for _, file := range files {
+		if !strings.HasSuffix(file.Name(), ".db") {
+			continue
+		}
+		name := strings.TrimSuffix(file.Name(), ".db")
+		if name == convID || strings.HasPrefix(name, convID) {
+			dbPath = filepath.Join(convsDir, file.Name())
+			fullConvID = name
+			break
+		}
+	}
+
+	if dbPath == "" {
+		return fmt.Errorf("no conversation database found matching ID: %s", convID)
+	}
+
+	fmt.Printf("🔍 Inspecting Antigravity Session: %s\n", fullConvID)
+	fmt.Printf("🗄️ Database Path: %s\n", dbPath)
+
+	fi, err := os.Stat(dbPath)
+	if err == nil {
+		fmt.Printf("🕒 Last Active: %s (%s ago)\n", fi.ModTime().Format("2006-01-02 15:04:05"), time.Since(fi.ModTime()).Round(time.Second))
+	}
+
+	// Get latest step info
+	idx, stepType, status, err := getLatestStep(dbPath)
+	if err == nil {
+		fmt.Printf("📊 Latest Step: Index=%d, Type=%d, Status=%d\n", idx, stepType, status)
+	}
+
+	// Query last 5 steps in detail
+	fmt.Println("\n📋 Recent Trajectory Steps:")
+	fmt.Println("--------------------------------------------------------------------------------")
+	cmd := exec.Command("sqlite3", dbPath, "select idx, step_type, status, has_subtrajectory from steps order by idx desc limit 5")
+	output, err := cmd.Output()
+	if err == nil && len(output) > 0 {
+		fmt.Print(string(output))
+	} else {
+		fmt.Println("No steps found or error reading steps table.")
+	}
 
 	return nil
 }
@@ -503,21 +923,26 @@ func buildProcessTree() (map[int][]int, error) {
 	return tree, nil
 }
 
-func getLatestStep(dbPath string) (int, int, error) {
-	cmd := exec.Command("sqlite3", dbPath, "select step_type, status from steps order by idx desc limit 1")
+func getLatestStep(dbPath string) (int, int, int, error) {
+	cmd := exec.Command("sqlite3", dbPath, "select idx, step_type, status from steps order by idx desc limit 1")
 	output, err := cmd.Output()
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 
 	parts := strings.Split(strings.TrimSpace(string(output)), "|")
-	if len(parts) >= 2 {
+	if len(parts) >= 3 {
+		idx, _ := strconv.Atoi(parts[0])
+		stepType, _ := strconv.Atoi(parts[1])
+		status, _ := strconv.Atoi(parts[2])
+		return idx, stepType, status, nil
+	} else if len(parts) == 2 {
 		stepType, _ := strconv.Atoi(parts[0])
 		status, _ := strconv.Atoi(parts[1])
-		return stepType, status, nil
+		return 0, stepType, status, nil
 	}
 
-	return 0, 0, nil
+	return 0, 0, 0, nil
 }
 
 func sendStartupNotification() {

@@ -9,6 +9,9 @@ build:
 telegram-test:
 	./bin/emorr-agy telegram send "🟢 Test message from emorr-agy CLI from justfile! [blood emoji]"
 
+listen: build
+	./bin/emorr-agy server
+
 clean:
 	rm -rf bin/ *.out
 
@@ -55,4 +58,3 @@ show-logs limit="10":
 		--project="${PROJ}" \
 		"${EXTRA_FLAGS[@]}" \
 		--format="table(timestamp, severity, jsonPayload.message)"
-

@@ -1,0 +1,8 @@
+{
+  "track_id": "multi_harness_detection_20260704",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-07-04T14:19:27+02:00",
+  "updated_at": "2026-07-04T14:19:27+02:00",
+  "description": "Detect multiple session types: agy CLI, Antigravity 2.0 (UI), and Claude Code"
+}

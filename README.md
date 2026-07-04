@@ -85,6 +85,50 @@ Or simply:
 * **Session Management**: Native `tmux` CLI integration with process status inference.
 * **State Persistence**: Simple JSON state tracking (e.g., `~/.emorragi_state.json`) for session restoration.
 
+## CLI Usage & Commands
+
+You can build the CLI binary using the standard `just build` recipe:
+```bash
+just build
+```
+This produces the compiled binary at `bin/emorragy`.
+
+### 📡 Active Thread Monitor (`monitor`)
+Monitor the state of active Antigravity (`agy`) threads in real-time, matching project directories, PIDs, active child tasks, SQLite steps, and execution states.
+
+```bash
+# Display all conversations (active and closed) once
+./bin/emorragy monitor
+
+# Display ONLY active/open conversations
+./bin/emorragy monitor --open
+
+# Continuous live-watch mode (auto-refreshing every 2 seconds)
+./bin/emorragy monitor --watch
+
+# Output structured JSON (ideal for programmatic integration)
+./bin/emorragy monitor --json
+
+# Compile the monitor report and send it directly to Telegram!
+./bin/emorragy monitor --telegram
+```
+
+### 🔍 Session DB Inspection (`inspect`)
+You can inspect the database trajectory of a specific session (by exact ID or prefix) directly in the terminal to view total steps, last active time, and recent execution steps:
+
+```bash
+./bin/emorragy monitor inspect 27c53697
+```
+
+### 💬 Custom Telegram Broadcasting (`telegram send`)
+Send a custom message directly to the Telegram bot channel:
+
+```bash
+./bin/emorragy telegram send "Ciao Riccardo! E. Morricone Ag is up and running!"
+```
+
+---
+
 ##  Curiosity
 
 The name comes from Ernst Morricone (genau, from "Die Importanz Ernst zu heissen", or simply "Ernst sein ist alles"), a fictional *secondo*  from kanton Uri. Ernst is a famous Orchestrator of Italian origins, famous for directing movies in the Swiss TV like "Die punktual, der pinglich and der langsam" and "Once upon a time in Appenzell".

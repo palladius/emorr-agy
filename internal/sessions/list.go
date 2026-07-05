@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -11,6 +12,14 @@ import (
 
 	"github.com/palladius/emorr-agy/internal/color"
 )
+
+// folderColor returns Cyan for symlink paths, Blue for normal dirs.
+func folderColor(path string) string {
+	if fi, err := os.Lstat(path); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return color.Cyan
+	}
+	return color.Blue
+}
 
 type ListOptions struct {
 	Harness    []string
@@ -24,6 +33,12 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 	sessions, err := engine.Classify(opts.Harness)
 	if err != nil {
 		return err
+	}
+
+	// Resolve home dir for tilde substitution in folder display
+	homeDir, _ := os.UserHomeDir()
+	if homeDir == "" {
+		homeDir = engine.homeDir
 	}
 
 	if opts.ActiveOnly {
@@ -82,7 +97,10 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			emoji := formatStatus(s)
 			harnessEmoji := getEmojiForHarness(s.Harness)
 			age := FormatAge(s.LastActivity)
-			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
+			folder := strings.ReplaceAll(s.Folder, homeDir, "~")
+			if folder == "" {
+				folder = "-"
+			}
 			if len(folder) > 30 {
 				folder = folder[:27] + "..."
 			}
@@ -96,8 +114,19 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 			desc := strings.TrimSpace(s.Description)
 			desc = strings.ReplaceAll(desc, "\n", " ")
+			if s.Title != "" {
+				desc = s.Title + " │ " + desc
+			}
+			if s.IsCron {
+				desc = "🔁 " + desc
+			}
 			if len(desc) > 60 {
 				desc = desc[:57] + "..."
+			}
+
+			coloredDesc := color.Colorize(desc, color.Cyan)
+			if s.WorktreeBranch != "" {
+				coloredDesc = "🌳 " + color.Colorize(s.WorktreeBranch, color.Green) + " " + coloredDesc
 			}
 
 			statusAndHarness := fmt.Sprintf("%s %s", emoji, harnessEmoji)
@@ -105,11 +134,11 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				color.Colorize(statusAndHarness, color.Plain),
 				color.Colorize(s.ID, color.BoldWhite),
 				color.Colorize(fmt.Sprintf("%3s", age), ageColor),
-				color.Colorize(folder, color.Blue),
+				color.Colorize(folder, folderColor(s.Folder)),
 				color.Colorize(s.Harness, color.Plain),
 				color.Colorize(strconv.Itoa(s.ProcessCount), color.Plain),
 				color.Colorize(s.ResumeCommand, color.Plain),
-				color.Colorize(desc, color.Cyan),
+				coloredDesc,
 			)
 		}
 		tw.Flush()
@@ -132,7 +161,10 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			emoji := formatStatus(s)
 			harnessEmoji := getEmojiForHarness(s.Harness)
 			age := FormatAge(s.LastActivity)
-			folder := strings.ReplaceAll(s.Folder, "/usr/local/google/home/ricc", "~")
+			folder := strings.ReplaceAll(s.Folder, homeDir, "~")
+			if folder == "" {
+				folder = "-"
+			}
 			if len(folder) > 30 {
 				folder = folder[:27] + "..."
 			}
@@ -146,8 +178,21 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 			desc := strings.TrimSpace(s.Description)
 			desc = strings.ReplaceAll(desc, "\n", " ")
+			// Prepend title if present (AG2UI annotation titles)
+			if s.Title != "" {
+				desc = s.Title + " │ " + desc
+			}
+			if s.IsCron {
+				desc = "🔁 " + desc
+			}
 			if len(desc) > 60 {
 				desc = desc[:57] + "..."
+			}
+
+			// Build colored description: worktree prefix in green, rest in cyan
+			coloredDesc := color.Colorize(desc, color.Cyan)
+			if s.WorktreeBranch != "" {
+				coloredDesc = "🌳 " + color.Colorize(s.WorktreeBranch, color.Green) + " " + coloredDesc
 			}
 
 			statusAndHarness := fmt.Sprintf("%s %s", emoji, harnessEmoji)
@@ -155,8 +200,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				color.Colorize(statusAndHarness, color.Plain),
 				color.Colorize(s.ID, color.BoldWhite),
 				color.Colorize(fmt.Sprintf("%3s", age), ageColor),
-				color.Colorize(folder, color.Blue),
-				color.Colorize(desc, color.Cyan),
+				color.Colorize(folder, folderColor(s.Folder)),
+				coloredDesc,
 			)
 		}
 		tw.Flush()
@@ -171,6 +216,8 @@ func getEmojiForHarness(harness string) string {
 		return "♊"
 	case "agy":
 		return "⬆️"
+	case "ag2ui":
+		return "🖥️"
 	case "claude":
 		return "🇫🇷"
 	default:

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,6 +29,8 @@ type Session struct {
 	Folder          string       `json:"folder"`
 	Title           string       `json:"title,omitempty"`
 	Description     string       `json:"description,omitempty"`
+	WorktreeBranch  string       `json:"worktree_branch,omitempty"`
+	IsCron          bool         `json:"is_cron,omitempty"`
 	LastActivity    time.Time    `json:"last_activity,omitempty"`
 	ProcessCount    int          `json:"process_count"`
 	ResumeCommand   string       `json:"resume_command,omitempty"`
@@ -198,13 +201,28 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 	if data, err := c.fs.ReadFile(cacheFile); err == nil {
 		var cacheConvs map[string]string
 		if err := json.Unmarshal(data, &cacheConvs); err == nil {
+			// Deduplicate: cacheConvs maps folder→convID, but the same convID
+			// can appear under multiple folders. Invert to convID→folder, keeping
+			// the most specific (longest) folder path.
+			dedupedConvs := make(map[string]string) // convID → folder
 			for folder, convID := range cacheConvs {
+				if existing, ok := dedupedConvs[convID]; !ok || len(folder) > len(existing) {
+					dedupedConvs[convID] = folder
+				}
+			}
+
+			for convID, folder := range dedupedConvs {
 				// If it's already running in tmux, skip adding a duplicate session
 				if runningMap[convID] {
 					continue
 				}
 
 				harness := "agy" // fallback for historical
+				// Check if this conversation belongs to Antigravity IDE (AG2UI)
+				ag2uiDbPath := filepath.Join(c.homeDir, ".gemini/antigravity/conversations", convID+".db")
+				if _, err := c.fs.Stat(ag2uiDbPath); err == nil {
+					harness = "ag2ui"
+				}
 				var state SessionState
 				var cachedAbout string
 				worthResuscitate := true
@@ -244,7 +262,11 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 				if fi, err := c.fs.Stat(dbPath); err == nil {
 					lastActivity = fi.ModTime()
 				} else {
-					if fi, err := c.fs.Stat(folder); err == nil {
+					// Also check AG2UI path
+					ag2uiDbPath := filepath.Join(c.homeDir, ".gemini/antigravity/conversations", convID+".db")
+					if fi, err := c.fs.Stat(ag2uiDbPath); err == nil {
+						lastActivity = fi.ModTime()
+					} else if fi, err := c.fs.Stat(folder); err == nil {
 						lastActivity = fi.ModTime()
 					}
 				}
@@ -260,6 +282,103 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 				}
 				sessions = append(sessions, s)
 			}
+		}
+	}
+
+	// 2b. Scan AG2UI (Antigravity IDE) conversations directory for additional sessions
+	ag2uiConvsDir := filepath.Join(c.homeDir, ".gemini/antigravity/conversations")
+	if entries, err := c.fs.ReadDir(ag2uiConvsDir); err == nil {
+		for _, entry := range entries {
+			name := entry.Name()
+			if !strings.HasSuffix(name, ".db") || strings.HasSuffix(name, ".db-shm") || strings.HasSuffix(name, ".db-wal") {
+				continue
+			}
+			convID := strings.TrimSuffix(name, ".db")
+			// Skip if already seen from tmux or CLI cache
+			if runningMap[convID] {
+				continue
+			}
+
+			// Check if already added from the CLI cache dedup step
+			alreadyAdded := false
+			for _, s := range sessions {
+				if s.ID == convID {
+					alreadyAdded = true
+					break
+				}
+			}
+			if alreadyAdded {
+				continue
+			}
+
+			runningMap[convID] = true
+
+			// Read annotation (.pbtxt) for title and archived status
+			var title string
+			var archived bool
+			annotPath := filepath.Join(c.homeDir, ".gemini/antigravity/annotations", convID+".pbtxt")
+			if annotData, err := c.fs.ReadFile(annotPath); err == nil {
+				annotStr := string(annotData)
+				// Parse title from text proto: title:"..."
+				if idx := strings.Index(annotStr, "title:\""); idx != -1 {
+					rest := annotStr[idx+7:]
+					if endIdx := strings.Index(rest, "\""); endIdx != -1 {
+						title = rest[:endIdx]
+					}
+				}
+				archived = strings.Contains(annotStr, "archived:true")
+			}
+
+			// Determine last activity from DB modification time
+			var lastActivity time.Time
+			dbPath := filepath.Join(ag2uiConvsDir, name)
+			if fi, err := c.fs.Stat(dbPath); err == nil {
+				lastActivity = fi.ModTime()
+			}
+
+			// Determine state
+			var state SessionState
+			if _, active := activeConvs[convID]; active {
+				state = StateOpenAgy
+			} else if archived {
+				state = StateDeadArchived
+			} else if !lastActivity.IsZero() && time.Since(lastActivity) > 7*24*time.Hour {
+				// Auto-archive stale AG2UI sessions (>7 days) since they
+				// can't be resumed from the CLI and just clutter the list.
+				state = StateDeadArchived
+			} else {
+				state = StateDeadResuscitatable
+			}
+
+			// For AG2UI, extract workspace from transcript paths.
+			description := c.getTranscriptDescription(convID)
+			folder, worktreeBranch := c.getTranscriptWorkspace(convID)
+
+			s := Session{
+				ID:             convID,
+				Harness:        "ag2ui",
+				State:          state,
+				Folder:         folder,
+				Title:          title,
+				WorktreeBranch: worktreeBranch,
+				LastActivity:   lastActivity,
+				ResumeCommand:  "antigravity2.0 --conversation " + convID,
+				Description:    description,
+			}
+			sessions = append(sessions, s)
+		}
+	}
+
+	// 2c. Detect cron jobs: AG2UI sessions with duplicate descriptions are from scheduled tasks.
+	ag2uiDescCount := make(map[string]int)
+	for i := range sessions {
+		if sessions[i].Harness == "ag2ui" && sessions[i].Description != "" {
+			ag2uiDescCount[sessions[i].Description]++
+		}
+	}
+	for i := range sessions {
+		if sessions[i].Harness == "ag2ui" && ag2uiDescCount[sessions[i].Description] > 1 {
+			sessions[i].IsCron = true
 		}
 	}
 
@@ -301,7 +420,7 @@ func (c *ClassificationEngine) FindActiveConvs() map[string]int {
 		return active
 	}
 
-	candidates := []string{"agy", "gemini", "claude", "emorr-agy", "python", "python3", "node", "go", "bash", "sh"}
+	candidates := []string{"agy", "gemini", "claude", "emorr-agy", "language_server", "antigravity", "python", "python3", "node", "go", "bash", "sh"}
 
 	for _, file := range files {
 		if !file.IsDir() {
@@ -345,7 +464,7 @@ func (c *ClassificationEngine) FindActiveConvs() map[string]int {
 				continue
 			}
 
-			if strings.Contains(target, "/.gemini/antigravity-cli/conversations/") && strings.HasSuffix(target, ".db") {
+			if (strings.Contains(target, "/.gemini/antigravity-cli/conversations/") || strings.Contains(target, "/.gemini/antigravity/conversations/")) && strings.HasSuffix(target, ".db") {
 				filename := filepath.Base(target)
 				convID := strings.TrimSuffix(filename, ".db")
 				active[convID] = pid
@@ -416,6 +535,11 @@ func (c *ClassificationEngine) getTranscriptDescription(sessionID string) string
 		filepath.Join(c.homeDir, ".gemini/antigravity-cli/brain", trimmedID, ".system_generated/logs/transcript_full.jsonl"),
 		filepath.Join(c.homeDir, ".gemini/antigravity-cli/brain", sessionID, ".system_generated/logs/transcript.jsonl"),
 		filepath.Join(c.homeDir, ".gemini/antigravity-cli/brain", sessionID, ".system_generated/logs/transcript_full.jsonl"),
+		// AG2UI paths
+		filepath.Join(c.homeDir, ".gemini/antigravity/brain", trimmedID, ".system_generated/logs/transcript.jsonl"),
+		filepath.Join(c.homeDir, ".gemini/antigravity/brain", trimmedID, ".system_generated/logs/transcript_full.jsonl"),
+		filepath.Join(c.homeDir, ".gemini/antigravity/brain", sessionID, ".system_generated/logs/transcript.jsonl"),
+		filepath.Join(c.homeDir, ".gemini/antigravity/brain", sessionID, ".system_generated/logs/transcript_full.jsonl"),
 	}
 
 	for _, p := range paths {
@@ -450,4 +574,92 @@ func (c *ClassificationEngine) getTranscriptDescription(sessionID string) string
 		}
 	}
 	return ""
+}
+
+// getTranscriptWorkspace extracts the workspace folder from an AG2UI transcript.
+// Returns (folder, worktreeBranch). For worktrees under .gemini/antigravity/worktrees/,
+// folder is the base project path (e.g. ~/git/banche-pvt) and worktreeBranch is the track name.
+func (c *ClassificationEngine) getTranscriptWorkspace(sessionID string) (string, string) {
+	transcriptPaths := []string{
+		filepath.Join(c.homeDir, ".gemini/antigravity/brain", sessionID, ".system_generated/logs/transcript.jsonl"),
+		filepath.Join(c.homeDir, ".gemini/antigravity-cli/brain", sessionID, ".system_generated/logs/transcript.jsonl"),
+	}
+
+	homeEscaped := regexp.QuoteMeta(c.homeDir)
+	worktreeRe := regexp.MustCompile(homeEscaped + `/.gemini/antigravity/worktrees/([a-zA-Z0-9_.-]+)/([a-zA-Z0-9_.-]+)`)
+	workspaceRe := regexp.MustCompile(homeEscaped + `/([a-zA-Z0-9_][a-zA-Z0-9_.-]{2,}(?:/[a-zA-Z0-9_][a-zA-Z0-9_.-]{2,})?)(?:[/"\\s]|$)`)
+
+	for _, p := range transcriptPaths {
+		data, err := c.fs.ReadFile(p)
+		if err != nil {
+			continue
+		}
+
+		lines := strings.SplitN(string(data), "\n", 50)
+		worktreeCounts := make(map[string]int)
+		workspaceCounts := make(map[string]int)
+
+		for _, line := range lines {
+			for _, m := range worktreeRe.FindAllStringSubmatch(line, -1) {
+				worktreeCounts[m[1]+"/"+m[2]]++
+			}
+			for _, m := range workspaceRe.FindAllStringSubmatch(line, -1) {
+				rel := m[1]
+				if strings.HasPrefix(rel, ".gemini") || strings.HasPrefix(rel, ".config") ||
+					strings.HasPrefix(rel, ".hermes") || strings.HasPrefix(rel, ".local") {
+					continue
+				}
+				parts := strings.SplitN(rel, "/", 3)
+				var key string
+				if len(parts) >= 2 {
+					key = parts[0] + "/" + parts[1]
+				} else {
+					key = parts[0]
+				}
+				workspaceCounts[key]++
+			}
+		}
+
+		if len(worktreeCounts) > 0 {
+			var bestKey string
+			var bestCount int
+			for k, v := range worktreeCounts {
+				if v > bestCount {
+					bestKey = k
+					bestCount = v
+				}
+			}
+			if bestKey != "" {
+				parts := strings.SplitN(bestKey, "/", 2)
+				project, track := parts[0], parts[1]
+				folder := ""
+				for _, cand := range []string{
+					filepath.Join(c.homeDir, "git", project),
+					filepath.Join(c.homeDir, project),
+				} {
+					if _, err := c.fs.Stat(cand); err == nil {
+						folder = cand
+						break
+					}
+				}
+				return folder, track
+			}
+		}
+
+		if len(workspaceCounts) > 0 {
+			var bestKey string
+			var bestCount int
+			for k, v := range workspaceCounts {
+				if v > bestCount {
+					bestKey = k
+					bestCount = v
+				}
+			}
+			if bestKey != "" {
+				return filepath.Join(c.homeDir, bestKey), ""
+			}
+		}
+	}
+
+	return "", ""
 }

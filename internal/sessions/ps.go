@@ -135,6 +135,9 @@ func GetDetailedStatus(homeDir, sessionID string) (status string, emoji string, 
 	paths := []string{
 		filepath.Join(homeDir, ".gemini/antigravity-cli/brain", sessionID, ".system_generated/logs/transcript.jsonl"),
 		filepath.Join(homeDir, ".gemini/antigravity-cli/brain", sessionID, ".system_generated/logs/transcript_full.jsonl"),
+		// AG2UI paths
+		filepath.Join(homeDir, ".gemini/antigravity/brain", sessionID, ".system_generated/logs/transcript.jsonl"),
+		filepath.Join(homeDir, ".gemini/antigravity/brain", sessionID, ".system_generated/logs/transcript_full.jsonl"),
 	}
 
 	var data []byte

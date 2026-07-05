@@ -229,3 +229,58 @@ func TestClassifySessions(t *testing.T) {
 		}
 	})
 }
+
+func TestClassifyDedupesMultipleFoldersPerConvID(t *testing.T) {
+	mockTmux := &MockTmuxRunner{sessions: nil} // No tmux sessions
+
+	mockFS := &MockFileSystem{
+		files: map[string][]byte{
+			"/home/ricc/.gemini/antigravity-cli/cache/last_conversations.json": []byte(`{
+				"/home/riccardo": "dup-conv-id-123",
+				"/home/riccardo/git/goliardia": "dup-conv-id-123",
+				"/home/riccardo/git/other-project": "unique-conv-id-456"
+			}`),
+		},
+		dirs: map[string][]os.DirEntry{},
+	}
+
+	engine := NewClassificationEngine(mockTmux, mockFS, "/home/ricc")
+	t.Setenv("EXCLUDE_RESUSCITATE", "")
+
+	sessions, err := engine.Classify(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Count how many sessions have the duplicate conv ID
+	dupCount := 0
+	var dupFolder string
+	uniqueCount := 0
+	for _, s := range sessions {
+		switch s.ID {
+		case "dup-conv-id-123":
+			dupCount++
+			dupFolder = s.Folder
+		case "unique-conv-id-456":
+			uniqueCount++
+		}
+	}
+
+	if dupCount != 1 {
+		t.Errorf("expected exactly 1 session for dup-conv-id-123, got %d", dupCount)
+	}
+
+	// Should keep the most specific (longest) folder path
+	if dupFolder != "/home/riccardo/git/goliardia" {
+		t.Errorf("expected folder to be /home/riccardo/git/goliardia (most specific), got %q", dupFolder)
+	}
+
+	if uniqueCount != 1 {
+		t.Errorf("expected exactly 1 session for unique-conv-id-456, got %d", uniqueCount)
+	}
+
+	// Total: 2 sessions, not 3
+	if len(sessions) != 2 {
+		t.Errorf("expected 2 total sessions after dedup, got %d", len(sessions))
+	}
+}

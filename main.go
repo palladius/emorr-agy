@@ -668,7 +668,7 @@ func padRight(s string, width int) string {
 	visualWidth := 0
 	for _, r := range runes {
 		// Emojis typically take 2 terminal cells
-		if r == '🟢' || r == '⚫' || r == '🛠' || r == '💬' || r == '✍' || r == '♊' || r == '🇫' || r == '🇷' || r == '❓' || r == '💤' || r == '💻' || r == '🔒' {
+		if r == '🟢' || r == '⚫' || r == '🛠' || r == '💬' || r == '✍' || r == '♊' || r == '🇫' || r == '🇷' || r == '❓' || r == '💤' || r == '💻' || r == '🔒' || r == '🖥' {
 			visualWidth += 2
 		} else {
 			visualWidth += 1
@@ -868,7 +868,7 @@ func findOpenConversations(cliPath string) (map[string]int, error) {
 				continue
 			}
 
-			if strings.Contains(target, "/.gemini/antigravity-cli/conversations/") && strings.HasSuffix(target, ".db") {
+			if (strings.Contains(target, "/.gemini/antigravity-cli/conversations/") || strings.Contains(target, "/.gemini/antigravity/conversations/")) && strings.HasSuffix(target, ".db") {
 				filename := filepath.Base(target)
 				convID := strings.TrimSuffix(filename, ".db")
 				openConvs[convID] = pid

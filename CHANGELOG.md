@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2026-07-05
+
+### Added
+- Multi-harness session detection: scans both `~/.gemini/antigravity-cli/` (agy) and `~/.gemini/antigravity/` (Antigravity 2.0/UI) for session discovery.
+- New `SessionSource` registry for extensible harness type scanning.
+- Emoji 🖥️ for `ag2ui` (Antigravity 2.0) harness type in session listings.
+- Cross-source session deduplication: tmux sessions take precedence over filesystem-only entries.
+- Added `--folder` / `-f` flag to `sessions list` command to filter sessions by directory path.
+  - Supports `~` expansion, relative paths, and `--folder .` for the current working directory.
+  - Works across all harness types (agy, ag2ui, gemini, claude).
+- Exported `IsPathMatch()` function in sessions package for reuse across commands.
+
 ## [0.1.4] - 2026-06-05
 
 ### Added

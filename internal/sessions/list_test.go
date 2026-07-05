@@ -364,3 +364,144 @@ func TestListSessionsAlignment(t *testing.T) {
 }
 
 
+func TestIsPathMatch(t *testing.T) {
+	tests := []struct {
+		name   string
+		dir    string
+		filter string
+		want   bool
+	}{
+		{"empty filter matches all", "/workspace/proj1", "", true},
+		{"exact match", "/workspace/proj1", "/workspace/proj1", true},
+		{"prefix match", "/workspace/proj1/sub", "/workspace/proj1", true},
+		{"no match", "/workspace/proj2", "/workspace/proj1", false},
+		{"trailing slash in filter", "/workspace/proj1/sub", "/workspace/proj1/", true},
+		{"partial name no match", "/workspace/proj10", "/workspace/proj1", false},
+		{"root match", "/workspace", "/workspace", true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := IsPathMatch(tc.dir, tc.filter)
+			if got != tc.want {
+				t.Errorf("IsPathMatch(%q, %q) = %v, want %v", tc.dir, tc.filter, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestListSessionsFolderFilter(t *testing.T) {
+	mockTmux := &MockTmuxRunner{
+		sessions: []TmuxSession{
+			{Name: "emagy-session-1", Path: "/workspace/proj1", Attached: true, Windows: 2},
+			{Name: "emagy-session-2", Path: "/workspace/proj2", Attached: true, Windows: 1},
+		},
+	}
+
+	mockFS := &MockFileSystem{
+		files: map[string][]byte{
+			"/home/ricc/.gemini/antigravity-cli/cache/last_conversations.json": []byte(`{
+				"/workspace/proj3": "session-dead-proj3"
+			}`),
+		},
+	}
+
+	engine := NewClassificationEngine(mockTmux, mockFS, "/home/ricc")
+
+	t.Run("Filter by folder prefix", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := ListSessions(&buf, engine, ListOptions{Format: "json", All: true, Folder: "/workspace/proj1"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		var sessionsList []Session
+		if err := json.Unmarshal(buf.Bytes(), &sessionsList); err != nil {
+			t.Fatalf("failed to parse JSON output: %v", err)
+		}
+
+		if len(sessionsList) != 1 {
+			t.Errorf("expected 1 session matching /workspace/proj1, got %d", len(sessionsList))
+		}
+		for _, s := range sessionsList {
+			if s.Folder != "/workspace/proj1" {
+				t.Errorf("expected folder /workspace/proj1, got %s", s.Folder)
+			}
+		}
+	})
+
+	t.Run("Filter with no matches", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := ListSessions(&buf, engine, ListOptions{Format: "json", All: true, Folder: "/nonexistent/path"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		var sessionsList []Session
+		if err := json.Unmarshal(buf.Bytes(), &sessionsList); err != nil {
+			// Empty JSON array should be null or []
+			if buf.String() != "null\n" && buf.String() != "[]\n" {
+				t.Fatalf("unexpected output: %s", buf.String())
+			}
+		}
+
+		if len(sessionsList) != 0 {
+			t.Errorf("expected 0 sessions for /nonexistent/path, got %d", len(sessionsList))
+		}
+	})
+
+	t.Run("Empty folder shows all", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := ListSessions(&buf, engine, ListOptions{Format: "json", All: true, Folder: ""})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		var sessionsList []Session
+		if err := json.Unmarshal(buf.Bytes(), &sessionsList); err != nil {
+			t.Fatalf("failed to parse JSON output: %v", err)
+		}
+
+		// Should have all sessions (tmux + filesystem)
+		if len(sessionsList) < 2 {
+			t.Errorf("expected at least 2 sessions with empty folder filter, got %d", len(sessionsList))
+		}
+	})
+}
+
+func TestListSessionsFolderFilterMultiHarness(t *testing.T) {
+	mockTmux := &MockTmuxRunner{
+		sessions: []TmuxSession{
+			{Name: "emagy-agy-sess", Path: "/workspace/proj1", Attached: true, Windows: 1},
+			{Name: "emgem-gem-sess", Path: "/workspace/proj1", Attached: true, Windows: 1},
+			{Name: "emagy-other-sess", Path: "/workspace/proj2", Attached: true, Windows: 1},
+		},
+	}
+
+	mockFS := &MockFileSystem{
+		files: map[string][]byte{},
+	}
+
+	engine := NewClassificationEngine(mockTmux, mockFS, "/home/ricc")
+
+	var buf bytes.Buffer
+	err := ListSessions(&buf, engine, ListOptions{Format: "json", All: true, Folder: "/workspace/proj1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var sessionsList []Session
+	if err := json.Unmarshal(buf.Bytes(), &sessionsList); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+
+	// Should have 2 sessions: agy-sess (agy) and gem-sess (gemini), both in /workspace/proj1
+	if len(sessionsList) != 2 {
+		t.Errorf("expected 2 sessions in /workspace/proj1 across harnesses, got %d", len(sessionsList))
+	}
+	for _, s := range sessionsList {
+		if s.Folder != "/workspace/proj1" {
+			t.Errorf("expected folder /workspace/proj1, got %s for session %s", s.Folder, s.ID)
+		}
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -26,6 +27,7 @@ type ListOptions struct {
 	Format     string // "short", "long", "json"
 	All        bool   // If false, exclude archived sessions
 	ActiveOnly bool   // If true, show only active/running sessions
+	Folder     string // If set, filter sessions by folder prefix match
 }
 
 // ListSessions retrieves and prints the classified sessions to the provided writer.
@@ -53,6 +55,17 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		var filtered []Session
 		for _, s := range sessions {
 			if s.State != StateDeadArchived {
+				filtered = append(filtered, s)
+			}
+		}
+		sessions = filtered
+	}
+
+	// Apply folder filter if set
+	if opts.Folder != "" {
+		var filtered []Session
+		for _, s := range sessions {
+			if IsPathMatch(s.Folder, opts.Folder) {
 				filtered = append(filtered, s)
 			}
 		}
@@ -208,6 +221,27 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 	}
 
 	return nil
+}
+
+// IsPathMatch returns true if dir matches the filter path. An empty filter matches
+// everything. The match is prefix-based: /workspace/proj1 matches /workspace/proj1/sub
+// but not /workspace/proj10 (full path component matching via trailing separator).
+func IsPathMatch(dir, filter string) bool {
+	if filter == "" {
+		return true
+	}
+	dir = filepath.Clean(dir)
+	filter = filepath.Clean(filter)
+
+	if dir == filter {
+		return true
+	}
+
+	sep := string(filepath.Separator)
+	if !strings.HasSuffix(filter, sep) {
+		filter += sep
+	}
+	return strings.HasPrefix(dir, filter)
 }
 
 func getEmojiForHarness(harness string) string {

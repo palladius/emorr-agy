@@ -22,7 +22,7 @@ import (
 	"github.com/palladius/emorr-agy/internal/telegram"
 )
 
-const Version = "0.1.4"
+const Version = "0.1.5"
 
 func main() {
 	// Load environment variables from .env if present
@@ -136,6 +136,7 @@ func main() {
 		case "list":
 			fs := flag.NewFlagSet("sessions list", flag.ExitOnError)
 			var harnessFlag string
+			var folderFlag string
 			var jsonFlag, longFlag, shortFlag bool
 			var allFlag, activeFlag bool
 
@@ -146,6 +147,8 @@ func main() {
 			fs.BoolVar(&allFlag, "all", false, "Include archived sessions")
 			fs.BoolVar(&allFlag, "a", false, "Include archived sessions (shorthand)")
 			fs.BoolVar(&activeFlag, "active", false, "Show only active/running sessions")
+			fs.StringVar(&folderFlag, "folder", "", "Filter by directory path (supports ~, relative, and . for cwd)")
+			fs.StringVar(&folderFlag, "f", "", "Filter by directory path (shorthand)")
 
 			_ = fs.Parse(os.Args[3:])
 
@@ -166,12 +169,28 @@ func main() {
 				}
 			}
 
+			// Resolve folder filter: handle ~, relative paths, and .
+			resolvedFolder := ""
+			if folderFlag != "" {
+				path := folderFlag
+				if strings.HasPrefix(path, "~") {
+					path = filepath.Join(homeDir, path[1:])
+				}
+				abs, err := filepath.Abs(path)
+				if err == nil {
+					resolvedFolder = abs
+				} else {
+					resolvedFolder = path
+				}
+			}
+
 			engine := sessions.NewClassificationEngine(sessions.RealTmuxRunner{}, sessions.OSFileSystem{}, homeDir)
 			opts := sessions.ListOptions{
 				Harness:    harnesses,
 				Format:     format,
 				All:        allFlag,
 				ActiveOnly: activeFlag,
+				Folder:     resolvedFolder,
 			}
 			if err := sessions.ListSessions(os.Stdout, engine, opts); err != nil {
 				log.Fatalf("Error listing sessions: %v", err)
@@ -260,6 +279,12 @@ func printUsage() {
 	fmt.Println("  emorr-agy sessions show <id> [opts] - Show session details and LLM status")
 	fmt.Println("  emorr-agy resume <id>               - Resume/resuscitate a dead or active session")
 	fmt.Println("  emorr-agy ps                        - Show active harness processes, CWD, and dynamic status")
+	fmt.Println("\nSessions List Flags:")
+	fmt.Println("  --folder, -f <path>       - Filter by directory path (supports ~, relative, . for cwd)")
+	fmt.Println("  --harness <type>          - Filter by harness type (comma-separated list)")
+	fmt.Println("  --all, -a                 - Include archived sessions")
+	fmt.Println("  --active                  - Show only active/running sessions")
+	fmt.Println("  --json / --long / --short  - Output format")
 	fmt.Println("\nMonitor Flags:")
 	fmt.Println("  --watch, -w, watch        - Enable continuous live watch mode")
 	fmt.Println("  --open, -o, open          - Show only active/open sessions")
@@ -475,7 +500,7 @@ func fetchThreads(cliPath string, onlyOpen bool, folderFilter string) ([]*Thread
 			continue
 		}
 		if folderFilter != "" {
-			if !isPathMatch(thread.Dir, absFilter) {
+			if !sessions.IsPathMatch(thread.Dir, absFilter) {
 				continue
 			}
 		}

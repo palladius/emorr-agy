@@ -410,6 +410,92 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 			sessions[i].IsCron = true
 		}
 	}
+	// 2d. Scan Gemini CLI sessions from ~/.gemini/tmp/*/logs.json
+	geminiTmpDir := filepath.Join(c.homeDir, ".gemini/tmp")
+	if tmpEntries, err := c.fs.ReadDir(geminiTmpDir); err == nil {
+		for _, tmpEntry := range tmpEntries {
+			if !tmpEntry.IsDir() {
+				continue
+			}
+			folderName := tmpEntry.Name()
+			logsPath := filepath.Join(geminiTmpDir, folderName, "logs.json")
+			data, err := c.fs.ReadFile(logsPath)
+			if err != nil {
+				continue
+			}
+
+			// Parse logs.json: array of {sessionId, messageId, type, message, timestamp}
+			var logEntries []struct {
+				SessionID string `json:"sessionId"`
+				MessageID int    `json:"messageId"`
+				Type      string `json:"type"`
+				Message   string `json:"message"`
+				Timestamp string `json:"timestamp"`
+			}
+			if err := json.Unmarshal(data, &logEntries); err != nil || len(logEntries) == 0 {
+				continue
+			}
+
+			// Find the latest session by timestamp
+			var latestSessionID, latestTimestamp string
+			for _, entry := range logEntries {
+				if entry.Timestamp > latestTimestamp {
+					latestTimestamp = entry.Timestamp
+					latestSessionID = entry.SessionID
+				}
+			}
+			if latestSessionID == "" || runningMap[latestSessionID] {
+				continue
+			}
+
+			// Get the first user message of this session as description
+			var description string
+			for _, entry := range logEntries {
+				if entry.SessionID == latestSessionID && entry.Type == "user" && entry.MessageID == 0 {
+					description = entry.Message
+					break
+				}
+			}
+
+			// Resolve the real folder path. folderName might be a slug (e.g. "gic25" → ~/git/gic25)
+			// Try common locations.
+			var folder string
+			for _, cand := range []string{
+				filepath.Join(c.homeDir, "git", folderName),
+				filepath.Join(c.homeDir, folderName),
+			} {
+				if _, err := c.fs.Stat(cand); err == nil {
+					folder = cand
+					break
+				}
+			}
+
+			// Determine state: active if a gemini CLI process is running in this folder
+			state := StateDeadResuscitatable
+			if folder != "" && geminiCwds[folder] {
+				state = StateOpenAgy
+				runningMap[latestSessionID] = true
+			}
+
+			// Parse timestamp for lastActivity
+			var lastActivity time.Time
+			if t, err := time.Parse(time.RFC3339Nano, latestTimestamp); err == nil {
+				lastActivity = t
+			} else if t, err := time.Parse("2006-01-02T15:04:05.000Z", latestTimestamp); err == nil {
+				lastActivity = t
+			}
+
+			sessions = append(sessions, Session{
+				ID:            latestSessionID,
+				Harness:       "gemini",
+				State:         state,
+				Folder:        folder,
+				LastActivity:  lastActivity,
+				ResumeCommand: "gemini --resume " + latestSessionID,
+				Description:   description,
+			})
+		}
+	}
 
 	// 3. Sort sessions: non-archived sessions on top, archived sessions at the bottom.
 	// Within those two groups, sort by last activity (mod time) descending, latest first.

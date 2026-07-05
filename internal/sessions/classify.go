@@ -448,12 +448,11 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 				continue
 			}
 
-			// Get the first user message of this session as description
+			// Get the latest user message of this session as description
 			var description string
 			for _, entry := range logEntries {
-				if entry.SessionID == latestSessionID && entry.Type == "user" && entry.MessageID == 0 {
+				if entry.SessionID == latestSessionID && entry.Type == "user" {
 					description = entry.Message
-					break
 				}
 			}
 

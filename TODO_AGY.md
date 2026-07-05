@@ -34,3 +34,16 @@ agy --resume a8e70ca6-39f9-4417-9e78-4790b123f2fa
 3. Phase 2: Emoji & display for `antigravity-ui`
 4. Phase 3: Cross-source deduplication
 5. Phase 4: Add `--folder` to `sessions list`
+
+
+## Ricardo last pastie
+
+  Done! Created TODO_AGY.md with everything you need.
+  
+  Resume after reboot:
+  
+    agy --resume a8e70ca6-39f9-4417-9e78-4790b123f2fa
+  
+  Then just say  /conductor:implement  to kick off Phase 1. See you after reboot! 🎼
+
+

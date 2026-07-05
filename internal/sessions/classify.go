@@ -195,6 +195,31 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 			sessions = append(sessions, s)
 		}
 	}
+	// 1b. Detect running Gemini CLI processes by cwd (they don't hold .db FDs open)
+	geminiCwds := make(map[string]bool) // cwd → true for running gemini CLI processes
+	if procEntries, err := c.fs.ReadDir("/proc"); err == nil {
+		for _, entry := range procEntries {
+			if !entry.IsDir() {
+				continue
+			}
+			if _, err := strconv.Atoi(entry.Name()); err != nil {
+				continue
+			}
+			cmdlinePath := filepath.Join("/proc", entry.Name(), "cmdline")
+			cmdlineBytes, err := c.fs.ReadFile(cmdlinePath)
+			if err != nil {
+				continue
+			}
+			cmdline := string(cmdlineBytes)
+			// Match Gemini CLI specifically (node process running /bin/gemini)
+			if strings.Contains(cmdline, "/bin/gemini") && !strings.Contains(cmdline, "antigravity") {
+				cwdPath := filepath.Join("/proc", entry.Name(), "cwd")
+				if cwd, err := c.fs.Readlink(cwdPath); err == nil {
+					geminiCwds[cwd] = true
+				}
+			}
+		}
+	}
 
 	// 2. Load historical and active non-tmux sessions from cache file
 	cacheFile := filepath.Join(c.homeDir, ".gemini/antigravity-cli/cache/last_conversations.json")
@@ -218,6 +243,10 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 				}
 
 				harness := "agy" // fallback for historical
+				// Check if a Gemini CLI process is running in this folder
+				if geminiCwds[folder] {
+					harness = "gemini"
+				}
 				// Check if this conversation belongs to Antigravity IDE (AG2UI)
 				ag2uiDbPath := filepath.Join(c.homeDir, ".gemini/antigravity/conversations", convID+".db")
 				if _, err := c.fs.Stat(ag2uiDbPath); err == nil {
@@ -244,8 +273,8 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 					cachedAbout = c.getTranscriptDescription(convID)
 				}
 
-				// If it's active in background processes but not in tmux, it's StateOpenAgy (emoji 🟢)
-				if _, active := activeConvs[convID]; active {
+				// If it's active in background processes or a Gemini CLI is running in this folder
+				if _, active := activeConvs[convID]; active || geminiCwds[folder] {
 					state = StateOpenAgy
 					runningMap[convID] = true
 				} else {
@@ -445,6 +474,19 @@ func (c *ClassificationEngine) FindActiveConvs() map[string]int {
 			if strings.Contains(procName, cand) {
 				isCandidate = true
 				break
+			}
+		}
+		// Fallback: check cmdline for node-based CLIs (e.g. Gemini CLI reports comm as "MainThread")
+		if !isCandidate {
+			cmdlinePath := filepath.Join("/proc", pidStr, "cmdline")
+			if cmdlineBytes, err := c.fs.ReadFile(cmdlinePath); err == nil {
+				cmdline := string(cmdlineBytes)
+				for _, cand := range candidates {
+					if strings.Contains(cmdline, "/"+cand) || strings.Contains(cmdline, cand) {
+						isCandidate = true
+						break
+					}
+				}
 			}
 		}
 		if !isCandidate {

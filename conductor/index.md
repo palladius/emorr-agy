@@ -89,7 +89,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 ---
 
-- [ ] **Track: Detect multiple session types (agy CLI, Antigravity 2.0 UI, Claude Code)**
+- [~] **Track: Detect multiple session types (agy CLI, Antigravity 2.0 UI, Claude Code)**
 *Link: [./tracks/multi_harness_detection_20260704/](./tracks/multi_harness_detection_20260704/)*
 
 

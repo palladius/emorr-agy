@@ -15,6 +15,8 @@ This track extends the `ClassificationEngine` to scan **multiple session source 
 - The `ClassificationEngine.Classify()` method must scan `~/.gemini/antigravity/conversations/` for `.db` files, the same way it currently scans `~/.gemini/antigravity-cli/conversations/`.
 - Sessions discovered from `~/.gemini/antigravity/` must be assigned `Harness: "antigravity-ui"`.
 - The `brain/` directory under `~/.gemini/antigravity/brain/<convID>/` must be used for transcript-based description extraction, mirroring the existing CLI logic.
+- **Titles**: Parse `~/.gemini/antigravity/annotations/<convID>.pbtxt` for conversation titles (plaintext protobuf format: `title:"..."`).
+- **Folder mapping**: Extract workspace URIs from `~/.gemini/antigravity/agyhub_summaries_proto.pb` by parsing `file:///...` paths paired with convIDs.
 
 ### FR-2: Configurable session source registry
 - Introduce a data structure (e.g., `SessionSource`) that maps harness name → base directory path (e.g., `{"agy": "~/.gemini/antigravity-cli", "antigravity-ui": "~/.gemini/antigravity/"}`).
@@ -32,6 +34,13 @@ This track extends the `ClassificationEngine` to scan **multiple session source 
 
 ### FR-5: Active session detection for Antigravity 2.0
 - Extend `FindActiveConvs()` to also scan `~/.gemini/antigravity/conversations/` for DB lock files, so active Antigravity 2.0 sessions show as 🟢 open_agy (or a new `open_antigravity_ui` state) rather than dead.
+
+### FR-6: Add `--folder` filter to `sessions list`
+- Currently only `emorr-agy monitor` has `--folder/-f` filtering. The `sessions list` command is missing this flag entirely.
+- Port the `isPathMatch()` logic from `main.go` to `internal/sessions/list.go`.
+- Add `Folder string` field to `ListOptions` and apply folder prefix matching to filter sessions.
+- Support `--folder .` (current directory), `--folder ~/git/emorr-agy` (absolute), and `--folder ~` (home).
+- The folder filter must work across all harness types (agy, antigravity-ui, claude).
 
 ## Non-Functional Requirements
 

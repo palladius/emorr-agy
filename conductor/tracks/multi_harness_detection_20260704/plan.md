@@ -46,3 +46,22 @@
     - [ ] Run tests and confirm they pass (Green Phase)
 
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Cross-Source Deduplication & Edge Cases' (Protocol in workflow.md)
+
+## Phase 4: Add `--folder` Filter to `sessions list`
+
+- [ ] Task: Write Tests — Folder filter for `ListSessions`
+    - [ ] Add test for `ListOptions.Folder` filtering sessions by folder prefix match
+    - [ ] Add test for `--folder .` resolving to current working directory
+    - [ ] Add test for folder filter working across multiple harness types
+    - [ ] Run tests and confirm they fail (Red Phase)
+
+- [ ] Task: Implement — Port `isPathMatch()` and add `--folder` flag
+    - [ ] Move or copy `isPathMatch()` from `main.go` to `internal/sessions/list.go` (or a shared util)
+    - [ ] Add `Folder string` field to `ListOptions` struct
+    - [ ] Apply folder prefix filtering in `ListSessions()` after classify
+    - [ ] Add `--folder` and `-f` flags to the `sessions list` FlagSet in `main.go`
+    - [ ] Handle `~` expansion and relative path resolution (`filepath.Abs`)
+    - [ ] Run tests and confirm they pass (Green Phase)
+
+- [ ] Task: Conductor - User Manual Verification 'Phase 4: Add `--folder` Filter to `sessions list`' (Protocol in workflow.md)
+

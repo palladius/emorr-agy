@@ -56,6 +56,7 @@ func main() {
 		sendToTelegram := false
 		inspectConvID := ""
 		folderFilter := ""
+		useLLM := false
 
 		for i := 2; i < len(os.Args); i++ {
 			arg := os.Args[i]
@@ -68,6 +69,8 @@ func main() {
 				jsonFormat = true
 			case "--telegram", "-t", "telegram":
 				sendToTelegram = true
+			case "--llm", "--classify":
+				useLLM = true
 			case "--folder", "-f", "folder":
 				if i+1 < len(os.Args) {
 					folderFilter = os.Args[i+1]
@@ -92,7 +95,7 @@ func main() {
 		}
 
 		if inspectConvID != "" {
-			err := runInspect(inspectConvID)
+			err := runInspect(inspectConvID, useLLM)
 			if err != nil {
 				log.Fatalf("Error inspecting thread: %v", err)
 			}
@@ -271,7 +274,7 @@ func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  emorr-agy telegram send <message>   - Send a message to Telegram")
 	fmt.Println("  emorr-agy monitor [flags]           - Monitor active agy threads with emojis")
-	fmt.Println("  emorr-agy monitor inspect <convID>  - Inspect a specific session in detail")
+	fmt.Println("  emorr-agy monitor inspect <convID> [--llm] - Inspect a specific session in detail (optional LLM classification)")
 	fmt.Println("  emorr-agy status                    - Show status of system, tmux, and threads")
 	fmt.Println("  emorr-agy server                    - Run the Telegram bot daemon receiver")
 	fmt.Println("  emorr-agy check                     - Verify tmux installation and mouse settings")
@@ -291,6 +294,7 @@ func printUsage() {
 	fmt.Println("  --json, -j, json          - Output thread information in JSON format")
 	fmt.Println("  --telegram, -t, telegram  - Send current monitor status report to Telegram")
 	fmt.Println("  --folder, -f, folder       - Filter by directory path (relative or absolute)")
+	fmt.Println("  --llm, --classify          - Enable LLM classification (requires GEMINI_API_KEY)")
 	printFooter()
 }
 
@@ -800,7 +804,7 @@ func sendMonitorToTelegram(threads []*ThreadInfo) error {
 	return telegram.SendTelegramMessage(sb.String())
 }
 
-func runInspect(convID string) error {
+func runInspect(convID string, useLLM bool) error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("failed to get user home dir: %w", err)
@@ -857,6 +861,22 @@ func runInspect(convID string) error {
 		fmt.Print(string(output))
 	} else {
 		fmt.Println("No steps found or error reading steps table.")
+	}
+
+	if useLLM {
+		apiKey := os.Getenv("GEMINI_API_KEY")
+		if apiKey == "" {
+			return fmt.Errorf("GEMINI_API_KEY environment variable is required when --llm or --classify is set")
+		}
+		classifier := sessions.NewGeminiClassifier(apiKey, homeDir)
+		res, err := classifier.Classify(fullConvID)
+		if err != nil {
+			return fmt.Errorf("classification failed: %w", err)
+		}
+		fmt.Printf("\n🧠 LLM CLASSIFICATION:\n")
+		fmt.Printf("  About:               %s\n", res.About)
+		fmt.Printf("  User Input Pending:  %t\n", res.UserInputPending)
+		fmt.Printf("  Worth Resuscitating: %t\n", res.WorthResuscitate)
 	}
 
 	return nil

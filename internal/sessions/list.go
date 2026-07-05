@@ -247,11 +247,11 @@ func IsPathMatch(dir, filter string) bool {
 func getEmojiForHarness(harness string) string {
 	switch harness {
 	case "gemini":
-		return "♊️"
+		return "♊"
 	case "agy":
-		return "⬆️"
+		return "⬆"
 	case "ag2ui":
-		return "🖥️"
+		return "🖥"
 	case "claude":
 		return "🇫🇷"
 	default:

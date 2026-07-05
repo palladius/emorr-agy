@@ -210,7 +210,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 			statusAndHarness := fmt.Sprintf("%s %s", emoji, harnessEmoji)
 			fmt.Fprintf(tw, "%s\t %s\t%s\t%s\t%s\n",
-				color.Colorize(statusAndHarness, color.Plain),
+				statusAndHarness,
 				color.Colorize(s.ID, color.BoldWhite),
 				color.Colorize(fmt.Sprintf("%3s", age), ageColor),
 				color.Colorize(folder, folderColor(s.Folder)),
@@ -247,11 +247,11 @@ func IsPathMatch(dir, filter string) bool {
 func getEmojiForHarness(harness string) string {
 	switch harness {
 	case "gemini":
-		return "♊\uFE0F"
+		return "♊ " // 3 bytes + space = 4 bytes, 1+1=2 visual cols (matches 🖥)
 	case "agy":
-		return "⬆\uFE0F"
+		return "⬆ " // 3 bytes + space = 4 bytes, 1+1=2 visual cols (matches 🖥)
 	case "ag2ui":
-		return "🖥\uFE0F"
+		return "🖥" // 4 bytes, 2 visual cols
 	case "claude":
 		return "🇫🇷"
 	default:

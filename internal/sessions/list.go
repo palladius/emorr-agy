@@ -158,9 +158,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 	default: // "short" or fallback
 		tw := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-			color.Colorize("ST T", color.Plain),
-			color.Colorize("  SESSION ID", color.Plain),
+		fmt.Fprintf(tw, "ST T  \t%s\t%s\t%s\t%s\n",
+			color.Colorize("SESSION ID", color.Plain),
 			color.Colorize("AGE", color.Plain),
 			color.Colorize("DIR", color.Plain),
 			color.Colorize("DESCRIPTION", color.Plain),
@@ -168,7 +167,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		hasPrintedSeparator := false
 		for _, s := range sessions {
 			if s.State == StateDeadArchived && !hasPrintedSeparator {
-				fmt.Fprintln(tw, "---\t---\t---\t---\t---")
+				fmt.Fprintln(tw, "---   \t---\t---\t---\t---")
 				hasPrintedSeparator = true
 			}
 			emoji := formatStatus(s)
@@ -208,9 +207,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				coloredDesc = "🌳 " + color.Colorize(s.WorktreeBranch, color.Green) + " " + coloredDesc
 			}
 
-			statusAndHarness := fmt.Sprintf("%s %s", emoji, harnessEmoji)
-			fmt.Fprintf(tw, "%s\t %s\t%s\t%s\t%s\n",
-				statusAndHarness,
+			fmt.Fprintf(tw, "%s %s\t%s\t%s\t%s\t%s\n",
+				emoji, harnessEmoji,
 				color.Colorize(s.ID, color.BoldWhite),
 				color.Colorize(fmt.Sprintf("%3s", age), ageColor),
 				color.Colorize(folder, folderColor(s.Folder)),
@@ -247,11 +245,11 @@ func IsPathMatch(dir, filter string) bool {
 func getEmojiForHarness(harness string) string {
 	switch harness {
 	case "gemini":
-		return "♊ " // 3 bytes + space = 4 bytes, 1+1=2 visual cols (matches 🖥)
+		return "♊️"
 	case "agy":
-		return "⬆ " // 3 bytes + space = 4 bytes, 1+1=2 visual cols (matches 🖥)
+		return "⬆️"
 	case "ag2ui":
-		return "🖥" // 4 bytes, 2 visual cols
+		return "🖥️"
 	case "claude":
 		return "🇫🇷"
 	default:

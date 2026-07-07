@@ -30,6 +30,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 - [telegram_server_interactive_commands_20260604](tracks/telegram_server_interactive_commands_20260604/index.md) (planned)
 - [interactive_llm_operator_20260605](tracks/interactive_llm_operator_20260605/index.md) (planned)
 - [multi_harness_detection_20260704](tracks/multi_harness_detection_20260704/index.md) (new)
+- [verbose_process_tree_20260707](tracks/verbose_process_tree_20260707/index.md) (new)
 
 ## References
 - [Product Guide](product.md)
@@ -91,5 +92,10 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 - [~] **Track: Detect multiple session types (agy CLI, Antigravity 2.0 UI, Claude Code)**
 *Link: [./tracks/multi_harness_detection_20260704/](./tracks/multi_harness_detection_20260704/)*
+
+---
+
+- [ ] **Track: Add --verbose flag to sessions list showing child process tree with PIDs in purple**
+*Link: [./tracks/verbose_process_tree_20260707/](./tracks/verbose_process_tree_20260707/)*
 
 

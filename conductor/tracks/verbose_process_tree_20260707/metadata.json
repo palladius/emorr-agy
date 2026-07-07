@@ -1,0 +1,8 @@
+{
+  "track_id": "verbose_process_tree_20260707",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-07-07T09:23:00Z",
+  "updated_at": "2026-07-07T09:23:00Z",
+  "description": "Add --verbose flag to sessions list showing child process tree with PIDs in purple"
+}

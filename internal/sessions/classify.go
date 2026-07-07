@@ -674,15 +674,23 @@ func (c *ClassificationEngine) getTranscriptDescription(sessionID string) string
 		if err != nil {
 			continue
 		}
-		lines := strings.SplitN(string(data), "\n", 2)
-		if len(lines) == 0 || lines[0] == "" {
-			continue
+		// Scan through lines to find the first USER_INPUT (not always on line 1)
+		lines := strings.Split(string(data), "\n")
+		maxLines := 50
+		if len(lines) < maxLines {
+			maxLines = len(lines)
 		}
-		var step struct {
-			Type    string `json:"type"`
-			Content string `json:"content"`
-		}
-		if err := json.Unmarshal([]byte(lines[0]), &step); err == nil {
+		for _, line := range lines[:maxLines] {
+			if line == "" {
+				continue
+			}
+			var step struct {
+				Type    string `json:"type"`
+				Content string `json:"content"`
+			}
+			if err := json.Unmarshal([]byte(line), &step); err != nil {
+				continue
+			}
 			if step.Type == "USER_INPUT" && step.Content != "" {
 				content := step.Content
 				if startIdx := strings.Index(content, "<USER_REQUEST>"); startIdx != -1 {

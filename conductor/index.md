@@ -31,6 +31,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 - [interactive_llm_operator_20260605](tracks/interactive_llm_operator_20260605/index.md) (planned)
 - [multi_harness_detection_20260704](tracks/multi_harness_detection_20260704/index.md) (new)
 - [verbose_process_tree_20260707](tracks/verbose_process_tree_20260707/index.md) (new)
+- [session_pid_childcount_20260707](tracks/session_pid_childcount_20260707/index.md) (new)
 
 ## References
 - [Product Guide](product.md)
@@ -97,5 +98,10 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 - [ ] **Track: Add --verbose flag to sessions list showing child process tree with PIDs in purple**
 *Link: [./tracks/verbose_process_tree_20260707/](./tracks/verbose_process_tree_20260707/)*
+
+---
+
+- [ ] **Track: Show session PID in purple when alive and compact child process count in normal mode**
+*Link: [./tracks/session_pid_childcount_20260707/](./tracks/session_pid_childcount_20260707/)*
 
 

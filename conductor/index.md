@@ -19,7 +19,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 - [000_initial_setup](tracks/000_initial_setup/index.md) (planned)
 - [agy_monitor_20260602](tracks/agy_monitor_20260602/index.md) (completed)
 - [telegram_channel_assets_20260602](tracks/telegram_channel_assets_20260602/index.md) (planned)
-- [logging_20260604](tracks/logging_20260604/index.md) (planned)
+- [logging_20260604](tracks/logging_20260604/index.md) (completed)
 - [rogue_session_cleanup_20260604](tracks/rogue_session_cleanup_20260604/index.md) (completed)
 - [harness_discovery_20260604](tracks/harness_discovery_20260604/index.md) (planned)
 - [codebase_modularization_20260604](tracks/codebase_modularization_20260604/index.md) (planned)
@@ -41,7 +41,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 ---
 
-- [ ] **Track: Implement Logging**
+- [x] **Track: Implement Logging**
 *Link: [./tracks/logging_20260604/](./tracks/logging_20260604/)*
 
 ---

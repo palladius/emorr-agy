@@ -1,8 +1,11 @@
 {
   "track_id": "logging_20260604",
   "type": "feature",
-  "status": "new",
+  "status": "completed",
   "created_at": "2026-06-04T09:46:00Z",
-  "updated_at": "2026-06-04T09:46:00Z",
-  "description": "Implement local daily rotating logging (v1) and structured GCP Cloud Logging/OTel integration (v2)."
+  "updated_at": "2026-07-05T19:07:44Z",
+  "description": "Implement local daily rotating logging (v1) and structured GCP Cloud Logging/OTel integration (v2).",
+  "agent": "interactive-cli-agent",
+  "worktree": ".worktrees/issue-logging_20260604-agent",
+  "resolution": "consolidated_with_server_logging_gcp_and_local_20260604"
 }

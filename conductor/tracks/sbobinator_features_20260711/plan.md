@@ -22,17 +22,17 @@
     - [ ] Add `ExtractRepoName(transcriptPath string) string` to transcript_analyzer.go
     - [ ] Regex scan tool call args and content for `/home/.../git/<repo>/...` pattern
 
-- [ ] Task: Implement supersession detection
+- [x] Task: Implement supersession detection `5386f5c`
     - [ ] Write tests for `DetectSupersession()` covering: newer session on same repo → true, only session for repo → false, different repos → false
     - [ ] Add `DetectSupersession(sessions []SessionMetadata) map[string]bool` — maps session ID to superseded status
     - [ ] Track latest session per repo, mark older ones as superseded
 
-- [ ] Task: Implement 7-day recency window classification
+- [x] Task: Implement 7-day recency window classification `5386f5c`
     - [ ] Write tests for `ClassifySession()` combining all factors: recent + not superseded + not quit → NeedsResume, recent + superseded → Obsolete, old + structurally interrupted → Obsolete, old + clean → Finished, explicit quit → Finished
     - [ ] Add `ClassifySession(meta SessionMetadata, isSuperseded bool, now time.Time) SessionClassification`
     - [ ] Wire all detection functions together
 
-- [ ] Task: Integrate classification into ListSessions output
+- [x] Task: Integrate classification into ListSessions output `5386f5c`
     - [ ] Write tests verifying ListSessions shows 3-state emojis (🟢/🔴/⚠️) instead of just Open/Closed
     - [ ] Modify `ListSessions()` in list.go to call `ClassifySession()` for dead sessions
     - [ ] Update short/long/JSON formats with classification field

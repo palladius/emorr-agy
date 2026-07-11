@@ -1,0 +1,9 @@
+{
+  "track_id": "sbobinator_features_20260711",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-07-11T11:52:00Z",
+  "updated_at": "2026-07-11T11:52:00Z",
+  "description": "Port NEEDS_RESUME classification, timeline viewer, auto-resume, and supersession detection from agy-sbobinator",
+  "github_issues": [6, 7, 8]
+}

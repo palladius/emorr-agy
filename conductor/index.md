@@ -32,6 +32,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 - [multi_harness_detection_20260704](tracks/multi_harness_detection_20260704/index.md) (new)
 - [verbose_process_tree_20260707](tracks/verbose_process_tree_20260707/index.md) (new)
 - [session_pid_childcount_20260707](tracks/session_pid_childcount_20260707/index.md) (new)
+- [sbobinator_features_20260711](tracks/sbobinator_features_20260711/index.md) (new)
 
 ## References
 - [Product Guide](product.md)
@@ -103,5 +104,10 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 - [ ] **Track: Show session PID in purple when alive and compact child process count in normal mode**
 *Link: [./tracks/session_pid_childcount_20260707/](./tracks/session_pid_childcount_20260707/)*
+
+---
+
+- [ ] **Track: Port NEEDS_RESUME classification, timeline viewer, auto-resume, and supersession detection from agy-sbobinator**
+*Link: [./tracks/sbobinator_features_20260711/](./tracks/sbobinator_features_20260711/)*
 
 

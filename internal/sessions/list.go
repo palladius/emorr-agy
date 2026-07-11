@@ -154,9 +154,6 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 			desc := strings.TrimSpace(s.Description)
 			desc = strings.ReplaceAll(desc, "\n", " ")
-			if s.Title != "" {
-				desc = s.Title + " │ " + desc
-			}
 			if s.IsCron {
 				desc = "🔁 " + desc
 			}
@@ -164,7 +161,16 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				desc = desc[:57] + "..."
 			}
 
-			coloredDesc := color.Colorize(desc, color.Cyan)
+			// Build colored description: title in Yellow with 🏷️, description in Cyan
+			var coloredDesc string
+			if s.Title != "" {
+				coloredDesc = "🏷️ " + color.Colorize(s.Title, color.Yellow)
+				if desc != "" {
+					coloredDesc += " │ " + color.Colorize(desc, color.Cyan)
+				}
+			} else {
+				coloredDesc = color.Colorize(desc, color.Cyan)
+			}
 			if s.WorktreeBranch != "" {
 				coloredDesc = "🌳 " + color.Colorize(s.WorktreeBranch, color.Green) + " " + coloredDesc
 			}
@@ -217,10 +223,6 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 			desc := strings.TrimSpace(s.Description)
 			desc = strings.ReplaceAll(desc, "\n", " ")
-			// Prepend title if present (AG2UI annotation titles)
-			if s.Title != "" {
-				desc = s.Title + " │ " + desc
-			}
 			if s.IsCron {
 				desc = "🔁 " + desc
 			}
@@ -228,8 +230,16 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				desc = desc[:57] + "..."
 			}
 
-			// Build colored description: worktree prefix in green, rest in cyan
-			coloredDesc := color.Colorize(desc, color.Cyan)
+			// Build colored description: title in Yellow with 🏷️, description in Cyan
+			var coloredDesc string
+			if s.Title != "" {
+				coloredDesc = "🏷️ " + color.Colorize(s.Title, color.Yellow)
+				if desc != "" {
+					coloredDesc += " │ " + color.Colorize(desc, color.Cyan)
+				}
+			} else {
+				coloredDesc = color.Colorize(desc, color.Cyan)
+			}
 			if s.WorktreeBranch != "" {
 				coloredDesc = "🌳 " + color.Colorize(s.WorktreeBranch, color.Green) + " " + coloredDesc
 			}

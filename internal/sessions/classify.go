@@ -274,11 +274,15 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 				attachedClients = 1
 			}
 
+			// Read annotation title from .pbtxt file (user-renamed sessions)
+			title := c.readAnnotationTitle(ts.Name)
+
 			s := Session{
 				ID:              ts.Name,
 				Harness:         harness,
 				State:           state,
 				Folder:          ts.Path,
+				Title:           title,
 				ProcessCount:    ts.Windows,
 				LastActivity:    lastActivity,
 				ResumeCommand:   "tmux attach -t " + ts.Name,
@@ -393,11 +397,15 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 					}
 				}
 
+				// Read annotation title from .pbtxt file (user-renamed sessions)
+				title := c.readAnnotationTitle(convID)
+
 				s := Session{
 					ID:            convID,
 					Harness:       harness,
 					State:         state,
 					Folder:        folder,
+					Title:         title,
 					LastActivity:  lastActivity,
 					ResumeCommand: "emorr-agy resume " + convID,
 					Description:   cachedAbout,
@@ -619,6 +627,10 @@ func (c *ClassificationEngine) FindActiveConvs() map[string]int {
 
 	candidates := []string{"agy", "gemini", "claude", "emorr-agy", "language_server", "antigravity", "python", "python3", "node", "go", "bash", "sh"}
 
+	// Regex to extract conversation IDs from cmdline args like:
+	//   --conversation=<uuid>  or  --conversation\x00<uuid>
+	convFlagRe := regexp.MustCompile(`--conversation[=\x00]([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`)
+
 	for _, file := range files {
 		if !file.IsDir() {
 			continue
@@ -644,16 +656,20 @@ func (c *ClassificationEngine) FindActiveConvs() map[string]int {
 				break
 			}
 		}
+
+		// Read cmdline (needed for both candidate fallback and conversation ID extraction)
+		cmdlinePath := filepath.Join("/proc", pidStr, "cmdline")
+		var cmdline string
+		if cmdlineBytes, err := c.fs.ReadFile(cmdlinePath); err == nil {
+			cmdline = string(cmdlineBytes)
+		}
+
 		// Fallback: check cmdline for node-based CLIs (e.g. Gemini CLI reports comm as "MainThread")
-		if !isCandidate {
-			cmdlinePath := filepath.Join("/proc", pidStr, "cmdline")
-			if cmdlineBytes, err := c.fs.ReadFile(cmdlinePath); err == nil {
-				cmdline := string(cmdlineBytes)
-				for _, cand := range candidates {
-					if strings.Contains(cmdline, "/"+cand) || strings.Contains(cmdline, cand) {
-						isCandidate = true
-						break
-					}
+		if !isCandidate && cmdline != "" {
+			for _, cand := range candidates {
+				if strings.Contains(cmdline, "/"+cand) || strings.Contains(cmdline, cand) {
+					isCandidate = true
+					break
 				}
 			}
 		}
@@ -661,6 +677,16 @@ func (c *ClassificationEngine) FindActiveConvs() map[string]int {
 			continue
 		}
 
+		// Strategy 1: Parse --conversation flag from cmdline to detect agy sessions
+		// that don't hold .db file descriptors open.
+		if cmdline != "" {
+			if matches := convFlagRe.FindStringSubmatch(cmdline); len(matches) >= 2 {
+				convID := matches[1]
+				active[convID] = pid
+			}
+		}
+
+		// Strategy 2: Check open file descriptors for .db files (existing approach)
 		fdDir := filepath.Join("/proc", pidStr, "fd")
 		fds, err := c.fs.ReadDir(fdDir)
 		if err != nil {
@@ -695,6 +721,42 @@ func getHarnessFromPrefix(name string) string {
 		return "claude"
 	}
 	return "unknown"
+}
+
+// readAnnotationTitle reads the session title from .pbtxt annotation files.
+// It checks both antigravity-cli and antigravity (AG2UI) annotation directories.
+func (c *ClassificationEngine) readAnnotationTitle(convID string) string {
+	// Strip emorr-agy prefixes to get the raw conversation ID
+	rawID := convID
+	for _, prefix := range []string{"emagy-", "emgem-", "emcld-"} {
+		if strings.HasPrefix(rawID, prefix) {
+			rawID = strings.TrimPrefix(rawID, prefix)
+			break
+		}
+	}
+
+	// Check both annotation directories
+	for _, annotDir := range []string{
+		filepath.Join(c.homeDir, ".gemini/antigravity-cli/annotations"),
+		filepath.Join(c.homeDir, ".gemini/antigravity/annotations"),
+	} {
+		for _, id := range []string{rawID, convID} {
+			annotPath := filepath.Join(annotDir, id+".pbtxt")
+			if annotData, err := c.fs.ReadFile(annotPath); err == nil {
+				annotStr := string(annotData)
+				if idx := strings.Index(annotStr, "title:\""); idx != -1 {
+					rest := annotStr[idx+7:]
+					if endIdx := strings.Index(rest, "\""); endIdx != -1 {
+						title := rest[:endIdx]
+						if title != "" {
+							return title
+						}
+					}
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func (c *ClassificationEngine) isExcluded(id, folder string) bool {

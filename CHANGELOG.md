@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-07-11
+
+### Fixed
+- **Active session detection**: agy CLI sessions that don't hold `.db` file descriptors open are now detected as live (🟢) by parsing `--conversation` flags from process cmdlines. Previously these showed as ⏸️ (paused).
+- **Session title from annotations**: read user-renamed session titles from `.pbtxt` annotation files for all session types (agy CLI, tmux), not just AG2UI. Titles now display with 🏷️ emoji in yellow, separate from the description.
+
 ## [0.2.0] - 2026-07-11
 
 ### Added

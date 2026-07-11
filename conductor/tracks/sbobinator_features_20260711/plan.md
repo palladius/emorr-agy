@@ -7,17 +7,17 @@
     - [ ] Create `internal/sessions/classification.go` with `SessionClassification` type (`Finished`, `NeedsResume`, `Obsolete`)
     - [ ] Add emoji and label helpers: `ClassificationEmoji()`, `ClassificationLabel()`
 
-- [ ] Task: Implement transcript-based structural interruption detection
+- [x] Task: Implement transcript-based structural interruption detection `798f28a`
     - [ ] Write tests for `IsStructurallyInterrupted()` covering: last step is PLANNER_RESPONSE with tool_calls → true, last step is PLANNER_RESPONSE without tool_calls → false, last step is USER_INPUT → false, empty transcript → false
     - [ ] Create `internal/sessions/transcript_analyzer.go` with `IsStructurallyInterrupted(transcriptPath string) bool`
     - [ ] Parse last step of transcript.jsonl, check if type is PLANNER_RESPONSE and tool_calls is non-empty
 
-- [ ] Task: Implement explicit quit detection
+- [x] Task: Implement explicit quit detection `798f28a`
     - [ ] Write tests for `IsExplicitQuit()` covering: `/quit`, `/exit`, `exit`, `quit`, `/q`, normal prompts, prompts with XML metadata wrapping
     - [ ] Add `IsExplicitQuit(transcriptPath string) bool` to transcript_analyzer.go
     - [ ] Extract last USER_INPUT content, clean XML metadata tags, check against quit commands
 
-- [ ] Task: Implement repo name extraction from transcripts
+- [x] Task: Implement repo name extraction from transcripts `798f28a`
     - [ ] Write tests for `ExtractRepoName()` covering: tool calls with file paths, multiple repos (returns most common), no paths → empty, system paths filtered out
     - [ ] Add `ExtractRepoName(transcriptPath string) string` to transcript_analyzer.go
     - [ ] Regex scan tool call args and content for `/home/.../git/<repo>/...` pattern

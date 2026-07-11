@@ -2,7 +2,7 @@
 
 ## Phase 1: 3-State Session Classification (P0 — GitHub Issue #6)
 
-- [ ] Task: Add SessionClassification type and constants
+- [x] Task: Add SessionClassification type and constants `f2b2124`
     - [ ] Write tests for classification constants and string representation in `internal/sessions/classification_test.go`
     - [ ] Create `internal/sessions/classification.go` with `SessionClassification` type (`Finished`, `NeedsResume`, `Obsolete`)
     - [ ] Add emoji and label helpers: `ClassificationEmoji()`, `ClassificationLabel()`

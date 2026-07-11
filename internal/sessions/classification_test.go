@@ -28,8 +28,8 @@ func TestClassificationEmoji(t *testing.T) {
 		want  string
 	}{
 		{"finished emoji", ClassFinished, "🟢"},
-		{"needs_resume emoji", ClassNeedsResume, "🔴"},
-		{"obsolete emoji", ClassObsolete, "⚠️"},
+		{"needs_resume emoji", ClassNeedsResume, "⏸️"},
+		{"obsolete emoji", ClassObsolete, "🪦"},
 		{"unknown emoji", SessionClassification("unknown"), "❓"},
 	}
 	for _, tt := range tests {
@@ -70,8 +70,8 @@ func TestClassificationString(t *testing.T) {
 		want  string
 	}{
 		{"finished string", ClassFinished, "🟢 FINISHED"},
-		{"needs_resume string", ClassNeedsResume, "🔴 NEEDS_RESUME"},
-		{"obsolete string", ClassObsolete, "⚠️ OBSOLETE"},
+		{"needs_resume string", ClassNeedsResume, "⏸️ NEEDS_RESUME"},
+		{"obsolete string", ClassObsolete, "🪦 OBSOLETE"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

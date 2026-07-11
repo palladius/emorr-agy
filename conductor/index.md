@@ -107,7 +107,7 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 ---
 
-- [ ] **Track: Port NEEDS_RESUME classification, timeline viewer, auto-resume, and supersession detection from agy-sbobinator**
+- [~] **Track: Port NEEDS_RESUME classification, timeline viewer, auto-resume, and supersession detection from agy-sbobinator**
 *Link: [./tracks/sbobinator_features_20260711/](./tracks/sbobinator_features_20260711/)*
 
 

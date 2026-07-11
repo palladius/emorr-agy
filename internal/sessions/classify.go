@@ -675,13 +675,8 @@ func (c *ClassificationEngine) getTranscriptDescription(sessionID string) string
 		if err != nil {
 			continue
 		}
-		// Scan through lines to find the first USER_INPUT (not always on line 1)
-		lines := strings.Split(string(data), "\n")
-		maxLines := 50
-		if len(lines) < maxLines {
-			maxLines = len(lines)
-		}
-		for _, line := range lines[:maxLines] {
+		// Scan through lines to find the first USER_INPUT entry
+		for _, line := range strings.Split(string(data), "\n") {
 			if line == "" {
 				continue
 			}

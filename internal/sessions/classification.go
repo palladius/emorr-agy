@@ -17,9 +17,9 @@ func (c SessionClassification) ClassificationEmoji() string {
 	case ClassFinished:
 		return "🟢"
 	case ClassNeedsResume:
-		return "🔴"
+		return "⏸️"
 	case ClassObsolete:
-		return "⚠️"
+		return "🪦"
 	default:
 		return "❓"
 	}

@@ -43,36 +43,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		homeDir = engine.homeDir
 	}
 
-	if opts.ActiveOnly {
-		var filtered []Session
-		for _, s := range sessions {
-			if s.State == StateOpenTmux || s.State == StateOpenAgy || s.State == StateOpenPrivate {
-				filtered = append(filtered, s)
-			}
-		}
-		sessions = filtered
-	} else if !opts.All {
-		var filtered []Session
-		for _, s := range sessions {
-			if s.State != StateDeadArchived {
-				filtered = append(filtered, s)
-			}
-		}
-		sessions = filtered
-	}
-
-	// Apply folder filter if set
-	if opts.Folder != "" {
-		var filtered []Session
-		for _, s := range sessions {
-			if IsPathMatch(s.Folder, opts.Folder) {
-				filtered = append(filtered, s)
-			}
-		}
-		sessions = filtered
-	}
-
-	// Classify dead sessions using transcript analysis
+	// Classify dead sessions using transcript analysis (must happen before filtering)
 	now := time.Now()
 	var metas []SessionMetadata
 	for _, s := range sessions {
@@ -91,6 +62,42 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			}
 		}
 	}
+
+	// Apply visibility filters
+	if opts.ActiveOnly {
+		var filtered []Session
+		for _, s := range sessions {
+			if s.State == StateOpenTmux || s.State == StateOpenAgy || s.State == StateOpenPrivate {
+				filtered = append(filtered, s)
+			}
+		}
+		sessions = filtered
+	} else if !opts.All {
+		// Default: show live sessions + NEEDS_RESUME + OBSOLETE (hide archived + finished)
+		var filtered []Session
+		for _, s := range sessions {
+			if s.State == StateDeadArchived {
+				continue // always hide archived in default view
+			}
+			if s.Classification == ClassFinished {
+				continue // hide finished dead sessions in default view
+			}
+			filtered = append(filtered, s)
+		}
+		sessions = filtered
+	}
+
+	// Apply folder filter if set
+	if opts.Folder != "" {
+		var filtered []Session
+		for _, s := range sessions {
+			if IsPathMatch(s.Folder, opts.Folder) {
+				filtered = append(filtered, s)
+			}
+		}
+		sessions = filtered
+	}
+
 
 	format := opts.Format
 	if format == "" {
@@ -317,6 +324,28 @@ func formatStatus(s Session) string {
 		return "🔒"
 	}
 	return emoji
+}
+
+// sessionIDColor returns the ANSI color for the session ID column.
+// Yellow for live sessions, BoldWhite for NEEDS_RESUME, DarkGray for finished/obsolete/archived.
+func sessionIDColor(s Session) string {
+	switch {
+	case s.State == StateOpenTmux || s.State == StateOpenAgy || s.State == StateOpenPrivate:
+		return color.Yellow
+	case s.Classification == ClassNeedsResume:
+		return color.BoldWhite
+	default:
+		return color.DarkGray
+	}
+}
+
+// sessionRowColor returns the ANSI color for all non-ID columns in a row.
+// DarkGray for finished/obsolete/archived, LightGray otherwise.
+func sessionRowColor(s Session) string {
+	if s.Classification == ClassFinished || s.Classification == ClassObsolete || s.State == StateDeadArchived {
+		return color.DarkGray
+	}
+	return ""
 }
 
 func FormatAge(t time.Time) string {

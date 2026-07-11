@@ -72,6 +72,26 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		sessions = filtered
 	}
 
+	// Classify dead sessions using transcript analysis
+	now := time.Now()
+	var metas []SessionMetadata
+	for _, s := range sessions {
+		if s.State == StateDeadResuscitatable || s.State == StateDeadArchived {
+			metas = append(metas, BuildSessionMetadata(s, engine.homeDir))
+		}
+	}
+	superseded := DetectSupersession(metas)
+	for i, s := range sessions {
+		if s.State == StateDeadResuscitatable || s.State == StateDeadArchived {
+			for _, m := range metas {
+				if m.ID == s.ID {
+					sessions[i].Classification = ClassifySession(m, superseded[s.ID], now)
+					break
+				}
+			}
+		}
+	}
+
 	format := opts.Format
 	if format == "" {
 		format = "short"
@@ -275,6 +295,11 @@ func getEmojiForState(state SessionState) string {
 }
 
 func formatStatus(s Session) string {
+	// For dead sessions, use 3-state classification if available
+	if (s.State == StateDeadResuscitatable || s.State == StateDeadArchived) && s.Classification != "" {
+		return s.Classification.ClassificationEmoji()
+	}
+
 	emoji := getEmojiForState(s.State)
 	if s.State == StateOpenTmux {
 		if s.AttachedClients == 0 {

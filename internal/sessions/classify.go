@@ -23,18 +23,19 @@ const (
 )
 
 type Session struct {
-	ID              string       `json:"id"`
-	Harness         string       `json:"harness"` // "agy", "gemini", "claude", "unknown"
-	State           SessionState `json:"state"`
-	Folder          string       `json:"folder"`
-	Title           string       `json:"title,omitempty"`
-	Description     string       `json:"description,omitempty"`
-	WorktreeBranch  string       `json:"worktree_branch,omitempty"`
-	IsCron          bool         `json:"is_cron,omitempty"`
-	LastActivity    time.Time    `json:"last_activity,omitempty"`
-	ProcessCount    int          `json:"process_count"`
-	ResumeCommand   string       `json:"resume_command,omitempty"`
-	AttachedClients int          `json:"attached_clients"`
+	ID              string                `json:"id"`
+	Harness         string                `json:"harness"` // "agy", "gemini", "claude", "unknown"
+	State           SessionState          `json:"state"`
+	Classification  SessionClassification `json:"classification,omitempty"`
+	Folder          string                `json:"folder"`
+	Title           string                `json:"title,omitempty"`
+	Description     string                `json:"description,omitempty"`
+	WorktreeBranch  string                `json:"worktree_branch,omitempty"`
+	IsCron          bool                  `json:"is_cron,omitempty"`
+	LastActivity    time.Time             `json:"last_activity,omitempty"`
+	ProcessCount    int                   `json:"process_count"`
+	ResumeCommand   string                `json:"resume_command,omitempty"`
+	AttachedClients int                   `json:"attached_clients"`
 }
 
 type TmuxSession struct {

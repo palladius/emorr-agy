@@ -33,9 +33,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Handle --version / -v anywhere in args
+	// Handle --version anywhere in args
 	for _, arg := range os.Args[1:] {
-		if arg == "--version" || arg == "-v" {
+		if arg == "--version" {
 			fmt.Printf("emorr-agy v%s\n", Version)
 			os.Exit(0)
 		}

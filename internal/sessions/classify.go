@@ -1,7 +1,9 @@
 package sessions
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -105,9 +107,10 @@ func (RealTmuxRunner) ListSessions() ([]TmuxSession, error) {
 }
 
 type ClassificationEngine struct {
-	tmux    TmuxRunner
-	fs      FileSystem
-	homeDir string
+	tmux          TmuxRunner
+	fs            FileSystem
+	homeDir       string
+	pathHashTable map[string]string // sha256(path) → path, lazily built
 }
 
 func NewClassificationEngine(tmux TmuxRunner, fs FileSystem, homeDir string) *ClassificationEngine {
@@ -116,6 +119,95 @@ func NewClassificationEngine(tmux TmuxRunner, fs FileSystem, homeDir string) *Cl
 		fs:      fs,
 		homeDir: homeDir,
 	}
+}
+
+// buildPathHashTable lazily builds a map of sha256(absolutePath) → absolutePath
+// by scanning known parent directories where projects live.
+func (c *ClassificationEngine) buildPathHashTable() map[string]string {
+	if c.pathHashTable != nil {
+		return c.pathHashTable
+	}
+	c.pathHashTable = make(map[string]string)
+
+	// Scan these parent directories for child folders
+	parentDirs := []string{
+		filepath.Join(c.homeDir, "git"),
+		c.homeDir,
+		filepath.Join(c.homeDir, "obsidian"),
+		filepath.Join(c.homeDir, "obsidian-pbt"),
+	}
+
+	for _, parent := range parentDirs {
+		entries, err := c.fs.ReadDir(parent)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			absPath := filepath.Join(parent, e.Name())
+			hash := fmt.Sprintf("%x", sha256.Sum256([]byte(absPath)))
+			c.pathHashTable[hash] = absPath
+		}
+	}
+
+	return c.pathHashTable
+}
+
+// resolveGeminiFolder resolves a ~/.gemini/tmp/<folderName> to its real working directory.
+// It tries:
+// 1. If folderName is a SHA256 hash (64 hex chars): direct lookup in hash table
+// 2. Read chats/*.jsonl for projectHash field: lookup in hash table
+// 3. Basename candidates: ~/git/<name>, ~/<name>, ~/obsidian/<name>, ~/obsidian-pbt/<name>
+func (c *ClassificationEngine) resolveGeminiFolder(folderName, geminiTmpDir string) string {
+	hashTable := c.buildPathHashTable()
+
+	// Strategy 1: If folderName IS a SHA256 hash, direct lookup
+	if len(folderName) == 64 {
+		if path, ok := hashTable[folderName]; ok {
+			return path
+		}
+	}
+
+	// Strategy 2: Read projectHash from chats/*.jsonl
+	chatsDir := filepath.Join(geminiTmpDir, folderName, "chats")
+	if chatEntries, err := c.fs.ReadDir(chatsDir); err == nil {
+		for _, ce := range chatEntries {
+			if !strings.HasSuffix(ce.Name(), ".jsonl") {
+				continue
+			}
+			data, err := c.fs.ReadFile(filepath.Join(chatsDir, ce.Name()))
+			if err != nil {
+				continue
+			}
+			// Read just the first line
+			firstLine := strings.SplitN(string(data), "\n", 2)[0]
+			var chatMeta struct {
+				ProjectHash string `json:"projectHash"`
+			}
+			if err := json.Unmarshal([]byte(firstLine), &chatMeta); err == nil && chatMeta.ProjectHash != "" {
+				if path, ok := hashTable[chatMeta.ProjectHash]; ok {
+					return path
+				}
+			}
+			break // only need first chat file
+		}
+	}
+
+	// Strategy 3: Basename candidates
+	for _, cand := range []string{
+		filepath.Join(c.homeDir, "git", folderName),
+		filepath.Join(c.homeDir, folderName),
+		filepath.Join(c.homeDir, "obsidian", folderName),
+		filepath.Join(c.homeDir, "obsidian-pbt", folderName),
+	} {
+		if _, err := c.fs.Stat(cand); err == nil {
+			return cand
+		}
+	}
+
+	return ""
 }
 
 // Classify scans active tmux sessions and saved configurations to return a classified list.
@@ -457,18 +549,8 @@ func (c *ClassificationEngine) Classify(harnessFilter []string) ([]Session, erro
 				}
 			}
 
-			// Resolve the real folder path. folderName might be a slug (e.g. "gic25" → ~/git/gic25)
-			// Try common locations.
-			var folder string
-			for _, cand := range []string{
-				filepath.Join(c.homeDir, "git", folderName),
-				filepath.Join(c.homeDir, folderName),
-			} {
-				if _, err := c.fs.Stat(cand); err == nil {
-					folder = cand
-					break
-				}
-			}
+			// Resolve the real folder path using hash table + candidates
+			folder := c.resolveGeminiFolder(folderName, geminiTmpDir)
 
 			// Determine state: active if a gemini CLI process is running in this folder
 			state := StateDeadResuscitatable

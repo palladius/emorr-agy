@@ -33,6 +33,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Handle --version / -v anywhere in args
+	for _, arg := range os.Args[1:] {
+		if arg == "--version" || arg == "-v" {
+			fmt.Printf("emorr-agy v%s\n", Version)
+			os.Exit(0)
+		}
+	}
+
 	command := os.Args[1]
 
 	switch command {

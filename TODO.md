@@ -1,4 +1,7 @@
 
 * Add install instructions to README. is there some magic thing like `go install github/repo/link`?
-- [ ] Why is description empty for some sessions? e.g. 💤 ⬆️ 8be91409-10f6-415d-9d49-03378be7d07f ~/git/banche-pvt (2026-07-05)
-- [ ] Gemini CLI sessions use ~/.gemini/tmp/<folder-name>/logs.json with sessionId field, NOT last_conversations.json. Need to scan this directory to properly discover Gemini CLI sessions and show ♊ emoji. Current cwd-matching approach only works when the cache also has the right folder→convID mapping.
+- [x] Why is description empty for some sessions? → Fixed: scan full transcript for first USER_INPUT (commit 4f5ab4f)
+- [x] Gemini CLI deep discovery via SHA256 path hashing → 81% folder resolution (commit ca3ba10)
+- [ ] 9 Gemini CLI sessions still unresolved (paths no longer exist on disk)
+- [ ] Performance: reading full transcript files for descriptions (could use bufio.Scanner for early exit)
+- [ ] ♊ emoji renders 1 col narrower than 🖥️/⬆️ (terminal font issue, no Go fix possible)

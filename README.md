@@ -85,13 +85,27 @@ Or simply:
 * **Session Management**: Native `tmux` CLI integration with process status inference.
 * **State Persistence**: Simple JSON state tracking (e.g., `~/.emorragi_state.json`) for session restoration.
 
-## CLI Usage & Commands
+## Installation
 
-You can build the CLI binary using the standard `just build` recipe:
+### Via `go install` (recommended)
+
 ```bash
-just build
+go install github.com/palladius/emorr-agy@latest
 ```
-This produces the compiled binary at `bin/emorragy`.
+
+This installs the `emorr-agy` binary to your `$GOPATH/bin` (or `$HOME/go/bin`).
+
+### From source
+
+```bash
+git clone https://github.com/palladius/emorr-agy.git
+cd emorr-agy
+go build -o bin/emorr-agy .
+```
+
+Or with [just](https://github.com/casey/just): `just build`
+
+## CLI Usage & Commands
 
 ### 📡 Active Thread Monitor (`monitor`)
 Monitor the state of active Antigravity (`agy`) threads in real-time, matching project directories, PIDs, active child tasks, SQLite steps, and execution states.

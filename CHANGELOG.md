@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-07-11
+
+### Added
+- **Deep Gemini CLI session discovery**: resolve `~/.gemini/tmp/` folders via SHA256 path hashing and `projectHash` from chat files. Resolution rate improved from 4% to 81%.
+- **Global `--version` flag**: works anywhere in args (e.g. `emorr-agy sessions list --all --version`).
+- **Installation instructions** in README (`go install github.com/palladius/emorr-agy@latest`).
+
+### Fixed
+- **Empty session descriptions**: scan full transcript for first `USER_INPUT` instead of only checking line 1. Sessions with many GENERIC/CHECKPOINT entries before user input now show correct descriptions.
+- **Test suite**: updated stale emoji expectations (⏸️ for needs_resume, 🪦 for obsolete).
+
 ## [0.1.7] - 2026-07-07
 
 ### Changed

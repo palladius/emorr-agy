@@ -5,23 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.4] - 2026-07-24
+## [0.2.7] - 2026-07-24
 
 ### Fixed
 - **Gemini Session Folder Resolution**: Fixed folder resolution for Gemini CLI sessions by supporting `.json` chat file formats alongside `.jsonl`. Increased path hashtable recursion depth limit from 3 to 6 to index deeply nested repositories. Added fallback path extraction from chat/log file contents when `projectHash` lookup fails.
 
+## [0.2.6] - 2026-07-24
+
+### Fixed
+- **Title Emoji Tag Placement**: Moved the `🏷️` tag emoji to the end of the session title (e.g. `Title🏷️ description`), ensuring normal non-bold Yellow styling for the title text.
+
+## [0.2.5] - 2026-07-24
+
+
+### Fixed
+- **Subfolder Color**: Changed horizontal subfolder text color from Cyan to Blue (`color.Blue`) in `emorr-agy sessions list` to eliminate visual conflict with titleless session descriptions rendered in Cyan.
+
+## [0.2.4] - 2026-07-24
+
+
+### Added
+- **Horizontal Parametric Subfolder Display**: In `emorr-agy sessions list`, subfolders (e.g. `📁 casalborsetti-cre-app/`) are now displayed horizontally on each session row right after the age column in Cyan. Empty/root paths omit the subfolder display. Worktrees are cleanly integrated into group headers (`📂 ~/path/to/repo 🌳 branch-name`).
+- **Session ID Shortening**: UUID session IDs are automatically shortened to their first two hyphenated components (e.g. `1dec76de-548e`).
+- **Formatted Titles**: Session titles now have `[` and `]` stripped, displaying in Yellow prefixed with `🏷️` and separated from Cyan descriptions by a single space without pipe `│` separators.
+>>>>>>> main
+
 ## [0.2.3] - 2026-07-24
+
 
 ### Fixed
 - **AG2UI Session inference**: fixed regex that extracted directory paths from `transcript.jsonl` allowing detection of paths deeper than two levels. Increased transcript scan limit from 50 to 500 lines to ensure path detection logic has enough context.
 
 ### Added
+- **Git Repo Root & Worktree Grouping**: `emorr-agy sessions list` now automatically detects Git repository root folders and Git Worktrees (`.worktrees/` or `worktrees/`). Worktrees display on their own subfolder line with a 🌳 tree emoji and the branch name in **Purple** (`  🌳 branch-name / subpath/`). Sessions are grouped under their top-level Git repo header (`📂 ~/git/repo`).
+
 - **Session Show Details**: added colored Title (Bold White) and Description (Italic Gray) display logic to `emorr-agy sessions show` to enrich detail views.
+
 
 ## [0.2.2] - 2026-07-24
 
 ### Added
-- **Group sessions by project/folder**: added `--group-by-folder`, `--grouped`, and `-g` CLI flags to `emorr-agy sessions list` to display active and resuscitatable sessions grouped by working directory with folder emoji headers (`📂 ~/path/to/folder`). Addresses GitHub Issue [#9](https://github.com/palladius/emorr-agy/issues/9).
+- **Group sessions by project/folder**: `emorr-agy sessions list` now groups active and resuscitatable sessions by working directory with folder emoji headers (`📂 ~/path/to/folder`) by default (`--group-by-folder` default `true`). Added `--flat` flag to opt out and retain flat listing. Addresses GitHub Issue [#9](https://github.com/palladius/emorr-agy/issues/9).
+
 
 ## [0.2.1] - 2026-07-11
 

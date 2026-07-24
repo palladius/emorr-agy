@@ -152,6 +152,7 @@ func main() {
 			var allFlag, activeFlag bool
 			var groupByFolderFlag bool
 			var flatFlag bool
+			var limitFlag int
 
 			fs.StringVar(&harnessFlag, "harness", "", "Filter by harness type (comma-separated list, e.g. agy,gemini)")
 			fs.BoolVar(&jsonFlag, "json", false, "JSON output format")
@@ -166,6 +167,9 @@ func main() {
 			fs.BoolVar(&groupByFolderFlag, "grouped", true, "Group sessions by directory/folder")
 			fs.BoolVar(&groupByFolderFlag, "g", true, "Group sessions by directory/folder (shorthand)")
 			fs.BoolVar(&flatFlag, "flat", false, "Display flat session list without folder grouping")
+			fs.IntVar(&limitFlag, "limit", 0, "Limit maximum number of displayed sessions (0 = unlimited)")
+			fs.IntVar(&limitFlag, "n", 0, "Limit maximum number of displayed sessions (shorthand)")
+
 
 
 
@@ -211,7 +215,9 @@ func main() {
 				ActiveOnly:    activeFlag,
 				Folder:        resolvedFolder,
 				GroupByFolder: groupByFolderFlag && !flatFlag,
+				Limit:         limitFlag,
 			}
+
 
 
 			if err := sessions.ListSessions(os.Stdout, engine, opts); err != nil {

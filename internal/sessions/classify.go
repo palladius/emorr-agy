@@ -33,7 +33,9 @@ type Session struct {
 	Title           string                `json:"title,omitempty"`
 	Description     string                `json:"description,omitempty"`
 	WorktreeBranch  string                `json:"worktree_branch,omitempty"`
+	Subfolder       string                `json:"subfolder,omitempty"`
 	IsCron          bool                  `json:"is_cron,omitempty"`
+
 	LastActivity    time.Time             `json:"last_activity,omitempty"`
 	ProcessCount    int                   `json:"process_count"`
 	ResumeCommand   string                `json:"resume_command,omitempty"`

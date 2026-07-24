@@ -23,12 +23,14 @@ func folderColor(path string) string {
 }
 
 type ListOptions struct {
-	Harness    []string
-	Format     string // "short", "long", "json"
-	All        bool   // If false, exclude archived sessions
-	ActiveOnly bool   // If true, show only active/running sessions
-	Folder     string // If set, filter sessions by folder prefix match
+	Harness       []string
+	Format        string // "short", "long", "json"
+	All           bool   // If false, exclude archived sessions
+	ActiveOnly    bool   // If true, show only active/running sessions
+	Folder        string // If set, filter sessions by folder prefix match
+	GroupByFolder bool   // If true, group output by directory/folder with emoji header
 }
+
 
 // ListSessions retrieves and prints the classified sessions to the provided writer.
 func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) error {
@@ -104,7 +106,12 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		format = "short"
 	}
 
+	if opts.GroupByFolder {
+		return renderGroupedSessions(w, sessions, homeDir, format)
+	}
+
 	switch format {
+
 	case "json":
 		data, err := json.MarshalIndent(sessions, "", "  ")
 		if err != nil {
@@ -375,3 +382,175 @@ func FormatAge(t time.Time) string {
 	days := int(d.Hours() / 24)
 	return fmt.Sprintf("%dd", days)
 }
+
+type FolderGroup struct {
+	Folder        string    `json:"folder"`
+	DisplayFolder string    `json:"display_folder"`
+	LastActivity  time.Time `json:"last_activity"`
+	Sessions      []Session `json:"sessions"`
+}
+
+func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, format string) error {
+	var groupOrder []string
+	groupsMap := make(map[string]*FolderGroup)
+
+	for _, s := range sessions {
+		folderKey := s.Folder
+		if folderKey != "" {
+			folderKey = filepath.Clean(folderKey)
+		}
+		g, exists := groupsMap[folderKey]
+		if !exists {
+			displayFolder := "-"
+			if folderKey != "" {
+				displayFolder = strings.ReplaceAll(folderKey, homeDir, "~")
+				displayFolder = "📂 " + displayFolder
+			} else {
+				displayFolder = "📁 (Unknown folder)"
+			}
+			g = &FolderGroup{
+				Folder:        folderKey,
+				DisplayFolder: displayFolder,
+				Sessions:      []Session{},
+			}
+			groupsMap[folderKey] = g
+			groupOrder = append(groupOrder, folderKey)
+		}
+		g.Sessions = append(g.Sessions, s)
+		if s.LastActivity.After(g.LastActivity) {
+			g.LastActivity = s.LastActivity
+		}
+	}
+
+	var groups []FolderGroup
+	for _, key := range groupOrder {
+		groups = append(groups, *groupsMap[key])
+	}
+
+	if format == "json" {
+		data, err := json.MarshalIndent(groups, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+		_, err = w.Write(data)
+		if err != nil {
+			return err
+		}
+		_, _ = w.Write([]byte("\n"))
+		return nil
+	}
+
+	// For text formats (short/long), print each group header and indented sessions
+	for i, g := range groups {
+		if i > 0 {
+			fmt.Fprintln(w)
+		}
+		fmt.Fprintln(w, color.Colorize(g.DisplayFolder, folderColor(g.Folder)))
+
+		tw := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
+		hasPrintedSeparator := false
+		if format == "long" {
+			for _, s := range g.Sessions {
+				if s.State == StateDeadArchived && !hasPrintedSeparator {
+					fmt.Fprintln(tw, "  ---\t---\t---\t---\t---\t---\t---\t---")
+					hasPrintedSeparator = true
+				}
+				emoji := formatStatus(s)
+				harnessEmoji := getEmojiForHarness(s.Harness)
+				age := FormatAge(s.LastActivity)
+
+				ageColor := color.LightGray
+				if !s.LastActivity.IsZero() && time.Since(s.LastActivity) < time.Hour {
+					ageColor = color.Green
+				} else if strings.Contains(age, "d") || age == "n/a" {
+					ageColor = color.DarkGray
+				}
+
+				desc := strings.TrimSpace(s.Description)
+				desc = strings.ReplaceAll(desc, "\n", " ")
+				if s.IsCron {
+					desc = "🔁 " + desc
+				}
+				if len(desc) > 60 {
+					desc = desc[:57] + "..."
+				}
+
+				var coloredDesc string
+				if s.Title != "" {
+					coloredDesc = "🏷️ " + color.Colorize(s.Title, color.Yellow)
+					if desc != "" {
+						coloredDesc += " │ " + color.Colorize(desc, color.Cyan)
+					}
+				} else {
+					coloredDesc = color.Colorize(desc, color.Cyan)
+				}
+				if s.WorktreeBranch != "" {
+					coloredDesc = "🌳 " + color.Colorize(s.WorktreeBranch, color.Green) + " " + coloredDesc
+				}
+
+				statusAndHarness := fmt.Sprintf("  %s %s", emoji, harnessEmoji)
+				fmt.Fprintf(tw, "%s\t %s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+					color.Colorize(statusAndHarness, color.Plain),
+					color.Colorize(s.ID, color.BoldWhite),
+					color.Colorize(fmt.Sprintf("%3s", age), ageColor),
+					color.Colorize("-", color.DarkGray),
+					color.Colorize(s.Harness, color.Plain),
+					color.Colorize(strconv.Itoa(s.ProcessCount), color.Plain),
+					color.Colorize(s.ResumeCommand, color.Plain),
+					coloredDesc,
+				)
+			}
+		} else { // short
+			for _, s := range g.Sessions {
+				if s.State == StateDeadArchived && !hasPrintedSeparator {
+					fmt.Fprintln(tw, "  ---   \t---\t---\t---\t---")
+					hasPrintedSeparator = true
+				}
+				emoji := formatStatus(s)
+				harnessEmoji := getEmojiForHarness(s.Harness)
+				age := FormatAge(s.LastActivity)
+
+				ageColor := color.LightGray
+				if !s.LastActivity.IsZero() && time.Since(s.LastActivity) < time.Hour {
+					ageColor = color.Green
+				} else if strings.Contains(age, "d") || age == "n/a" {
+					ageColor = color.DarkGray
+				}
+
+				desc := strings.TrimSpace(s.Description)
+				desc = strings.ReplaceAll(desc, "\n", " ")
+				if s.IsCron {
+					desc = "🔁 " + desc
+				}
+				if len(desc) > 60 {
+					desc = desc[:57] + "..."
+				}
+
+				var coloredDesc string
+				if s.Title != "" {
+					coloredDesc = "🏷️ " + color.Colorize(s.Title, color.Yellow)
+					if desc != "" {
+						coloredDesc += " │ " + color.Colorize(desc, color.Cyan)
+					}
+				} else {
+					coloredDesc = color.Colorize(desc, color.Cyan)
+				}
+				if s.WorktreeBranch != "" {
+					coloredDesc = "🌳 " + color.Colorize(s.WorktreeBranch, color.Green) + " " + coloredDesc
+				}
+
+				fmt.Fprintf(tw, "  %s %s\t%s\t%s\t%s\t%s\n",
+					emoji, harnessEmoji,
+					color.Colorize(s.ID, color.BoldWhite),
+					color.Colorize(fmt.Sprintf("%3s", age), ageColor),
+					color.Colorize("-", color.DarkGray),
+					coloredDesc,
+				)
+			}
+		}
+		tw.Flush()
+	}
+
+	return nil
+}
+

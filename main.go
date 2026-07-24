@@ -150,6 +150,8 @@ func main() {
 			var folderFlag string
 			var jsonFlag, longFlag, shortFlag bool
 			var allFlag, activeFlag bool
+			var groupByFolderFlag bool
+			var flatFlag bool
 
 			fs.StringVar(&harnessFlag, "harness", "", "Filter by harness type (comma-separated list, e.g. agy,gemini)")
 			fs.BoolVar(&jsonFlag, "json", false, "JSON output format")
@@ -160,6 +162,12 @@ func main() {
 			fs.BoolVar(&activeFlag, "active", false, "Show only active/running sessions")
 			fs.StringVar(&folderFlag, "folder", "", "Filter by directory path (supports ~, relative, and . for cwd)")
 			fs.StringVar(&folderFlag, "f", "", "Filter by directory path (shorthand)")
+			fs.BoolVar(&groupByFolderFlag, "group-by-folder", true, "Group sessions by directory/folder (default: true)")
+			fs.BoolVar(&groupByFolderFlag, "grouped", true, "Group sessions by directory/folder")
+			fs.BoolVar(&groupByFolderFlag, "g", true, "Group sessions by directory/folder (shorthand)")
+			fs.BoolVar(&flatFlag, "flat", false, "Display flat session list without folder grouping")
+
+
 
 			_ = fs.Parse(os.Args[3:])
 
@@ -197,12 +205,15 @@ func main() {
 
 			engine := sessions.NewClassificationEngine(sessions.RealTmuxRunner{}, sessions.OSFileSystem{}, homeDir)
 			opts := sessions.ListOptions{
-				Harness:    harnesses,
-				Format:     format,
-				All:        allFlag,
-				ActiveOnly: activeFlag,
-				Folder:     resolvedFolder,
+				Harness:       harnesses,
+				Format:        format,
+				All:           allFlag,
+				ActiveOnly:    activeFlag,
+				Folder:        resolvedFolder,
+				GroupByFolder: groupByFolderFlag && !flatFlag,
 			}
+
+
 			if err := sessions.ListSessions(os.Stdout, engine, opts); err != nil {
 				log.Fatalf("Error listing sessions: %v", err)
 			}

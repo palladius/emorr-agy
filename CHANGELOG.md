@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-07-24
+
+### Fixed
+- **AG2UI Session inference**: fixed regex that extracted directory paths from `transcript.jsonl` allowing detection of paths deeper than two levels. Increased transcript scan limit from 50 to 500 lines to ensure path detection logic has enough context.
+
+### Added
+- **Session Show Details**: added colored Title (Bold White) and Description (Italic Gray) display logic to `emorr-agy sessions show` to enrich detail views.
+
+## [0.2.2] - 2026-07-24
+
+### Added
+- **Group sessions by project/folder**: added `--group-by-folder`, `--grouped`, and `-g` CLI flags to `emorr-agy sessions list` to display active and resuscitatable sessions grouped by working directory with folder emoji headers (`📂 ~/path/to/folder`). Addresses GitHub Issue [#9](https://github.com/palladius/emorr-agy/issues/9).
+
 ## [0.2.1] - 2026-07-11
+
 
 ### Fixed
 - **Active session detection**: agy CLI sessions that don't hold `.db` file descriptors open are now detected as live (🟢) by parsing `--conversation` flags from process cmdlines. Previously these showed as ⏸️ (paused).

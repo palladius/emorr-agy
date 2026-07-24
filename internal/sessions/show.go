@@ -84,6 +84,12 @@ func ShowSession(w io.Writer, engine *ClassificationEngine, sessionID string, op
 
 	fmt.Fprintf(w, "SESSION ID:     %s\n", target.ID)
 	fmt.Fprintf(w, "HARNESS:        %s\n", target.Harness)
+	if target.Title != "" {
+		fmt.Fprintf(w, "TITLE:          %s\n", color.Colorize(target.Title, color.BoldWhite))
+	}
+	if target.Description != "" {
+		fmt.Fprintf(w, "DESCRIPTION:    %s\n", color.Colorize(target.Description, color.ItalicGray))
+	}
 	fmt.Fprintf(w, "STATE:          %s\n", detailedState)
 	folder := strings.ReplaceAll(target.Folder, "/usr/local/google/home/ricc", "~")
 	fmt.Fprintf(w, "DIRECTORY:      %s\n", folder)
@@ -458,6 +464,12 @@ func GetSessionDetailsAndOptions(homeDir string, sessionID string) (string, []Pa
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("*SESSION ID:* %s\n", target.ID))
 	sb.WriteString(fmt.Sprintf("*HARNESS:*    %s\n", target.Harness))
+	if target.Title != "" {
+		sb.WriteString(fmt.Sprintf("*TITLE:*      %s\n", target.Title))
+	}
+	if target.Description != "" {
+		sb.WriteString(fmt.Sprintf("*DESCRIPTION:* %s\n", target.Description))
+	}
 	sb.WriteString(fmt.Sprintf("*STATE:*      %s\n", detailedState))
 	folder := strings.ReplaceAll(target.Folder, "/usr/local/google/home/ricc", "~")
 	sb.WriteString(fmt.Sprintf("*DIRECTORY:*  %s\n", folder))

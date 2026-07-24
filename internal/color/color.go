@@ -24,6 +24,7 @@ const (
 	Yellow    = "\033[00;33m"
 	Green     = "\033[00;32m"
 	Plain     = "\033[00;00m" // Dummy style to preserve alignment for uncolored cells
+	ItalicGray = "\033[03;90m"
 	Reset     = "\033[0m"
 )
 

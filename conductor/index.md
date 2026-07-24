@@ -33,6 +33,9 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 - [verbose_process_tree_20260707](tracks/verbose_process_tree_20260707/index.md) (new)
 - [session_pid_childcount_20260707](tracks/session_pid_childcount_20260707/index.md) (new)
 - [sbobinator_features_20260711](tracks/sbobinator_features_20260711/index.md) (new)
+- [group_by_project_folder_20260724](tracks/group_by_project_folder_20260724/index.md) (completed)
+
+
 
 ## References
 - [Product Guide](product.md)
@@ -109,5 +112,12 @@ Refer to the [Architecture Infographic](file:///usr/local/google/home/ricc/git/e
 
 - [~] **Track: Port NEEDS_RESUME classification, timeline viewer, auto-resume, and supersession detection from agy-sbobinator**
 *Link: [./tracks/sbobinator_features_20260711/](./tracks/sbobinator_features_20260711/)*
+
+---
+
+- [x] **Track: Group Sessions by Project/Folder**
+*Link: [./tracks/group_by_project_folder_20260724/](./tracks/group_by_project_folder_20260724/)*
+
+
 
 

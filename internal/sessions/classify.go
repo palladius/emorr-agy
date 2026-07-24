@@ -138,18 +138,29 @@ func (c *ClassificationEngine) buildPathHashTable() map[string]string {
 	}
 
 	for _, parent := range parentDirs {
-		entries, err := c.fs.ReadDir(parent)
-		if err != nil {
-			continue
-		}
-		for _, e := range entries {
-			if !e.IsDir() {
-				continue
+		var walk func(dir string, level int)
+		walk = func(dir string, level int) {
+			if level > 3 {
+				return
 			}
-			absPath := filepath.Join(parent, e.Name())
-			hash := fmt.Sprintf("%x", sha256.Sum256([]byte(absPath)))
-			c.pathHashTable[hash] = absPath
+			entries, err := c.fs.ReadDir(dir)
+			if err != nil {
+				return
+			}
+			for _, e := range entries {
+				if !e.IsDir() {
+					continue
+				}
+				if e.Name() == ".git" || e.Name() == "node_modules" {
+					continue
+				}
+				absPath := filepath.Join(dir, e.Name())
+				hash := fmt.Sprintf("%x", sha256.Sum256([]byte(absPath)))
+				c.pathHashTable[hash] = absPath
+				walk(absPath, level+1)
+			}
 		}
+		walk(parent, 1)
 	}
 
 	return c.pathHashTable
@@ -862,7 +873,7 @@ func (c *ClassificationEngine) getTranscriptWorkspace(sessionID string) (string,
 
 	homeEscaped := regexp.QuoteMeta(c.homeDir)
 	worktreeRe := regexp.MustCompile(homeEscaped + `/.gemini/antigravity/worktrees/([a-zA-Z0-9_.-]+)/([a-zA-Z0-9_.-]+)`)
-	workspaceRe := regexp.MustCompile(homeEscaped + `/([a-zA-Z0-9_][a-zA-Z0-9_.-]{2,}(?:/[a-zA-Z0-9_][a-zA-Z0-9_.-]{2,})?)(?:[/"\\s]|$)`)
+	workspaceRe := regexp.MustCompile(homeEscaped + `/([a-zA-Z0-9_][a-zA-Z0-9_./-]*)(?:[/"\\s]|$)`)
 
 	for _, p := range transcriptPaths {
 		data, err := c.fs.ReadFile(p)
@@ -870,7 +881,7 @@ func (c *ClassificationEngine) getTranscriptWorkspace(sessionID string) (string,
 			continue
 		}
 
-		lines := strings.SplitN(string(data), "\n", 50)
+		lines := strings.SplitN(string(data), "\n", 500)
 		worktreeCounts := make(map[string]int)
 		workspaceCounts := make(map[string]int)
 
@@ -884,14 +895,17 @@ func (c *ClassificationEngine) getTranscriptWorkspace(sessionID string) (string,
 					strings.HasPrefix(rel, ".hermes") || strings.HasPrefix(rel, ".local") {
 					continue
 				}
-				parts := strings.SplitN(rel, "/", 3)
-				var key string
-				if len(parts) >= 2 {
-					key = parts[0] + "/" + parts[1]
-				} else {
-					key = parts[0]
+				parts := strings.Split(rel, "/")
+				start := 1
+				if len(parts) >= 2 && (parts[0] == "git" || parts[0] == "obsidian" || parts[0] == "obsidian-pbt") {
+					start = 2
 				}
-				workspaceCounts[key]++
+				for i := start; i <= len(parts); i++ {
+					key := strings.Join(parts[:i], "/")
+					if key != "" {
+						workspaceCounts[key]++
+					}
+				}
 			}
 		}
 
@@ -925,7 +939,7 @@ func (c *ClassificationEngine) getTranscriptWorkspace(sessionID string) (string,
 			var bestKey string
 			var bestCount int
 			for k, v := range workspaceCounts {
-				if v > bestCount {
+				if v > bestCount || (v == bestCount && len(k) > len(bestKey)) {
 					bestKey = k
 					bestCount = v
 				}

@@ -504,3 +504,63 @@ func TestListSessionsFolderFilterMultiHarness(t *testing.T) {
 		}
 	}
 }
+
+func TestListSessionsGroupByFolder(t *testing.T) {
+	mockTmux := &MockTmuxRunner{
+		sessions: []TmuxSession{
+			{Name: "emagy-sess1", Path: "/workspace/projA", Attached: true, Windows: 1},
+			{Name: "emagy-sess2", Path: "/workspace/projA", Attached: true, Windows: 1},
+			{Name: "emgem-sess3", Path: "/workspace/projB", Attached: true, Windows: 1},
+		},
+	}
+
+	mockFS := &MockFileSystem{
+		files: map[string][]byte{},
+	}
+
+	engine := NewClassificationEngine(mockTmux, mockFS, "/home/ricc")
+
+	t.Run("Short format grouped by folder", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := ListSessions(&buf, engine, ListOptions{Format: "short", All: true, GroupByFolder: true})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		out := buf.String()
+
+		if !strings.Contains(out, "📂 /workspace/projA") {
+			t.Errorf("expected header '📂 /workspace/projA', got: %s", out)
+		}
+		if !strings.Contains(out, "📂 /workspace/projB") {
+			t.Errorf("expected header '📂 /workspace/projB', got: %s", out)
+		}
+		if !strings.Contains(out, "sess1") || !strings.Contains(out, "sess2") || !strings.Contains(out, "sess3") {
+			t.Errorf("expected all sessions in output, got: %s", out)
+		}
+	})
+
+	t.Run("JSON format grouped by folder", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := ListSessions(&buf, engine, ListOptions{Format: "json", All: true, GroupByFolder: true})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		var groups []FolderGroup
+		if err := json.Unmarshal(buf.Bytes(), &groups); err != nil {
+			t.Fatalf("failed to unmarshal JSON grouped output: %v", err)
+		}
+
+		if len(groups) != 2 {
+			t.Fatalf("expected 2 folder groups, got %d", len(groups))
+		}
+
+		if groups[0].Folder != "/workspace/projA" || len(groups[0].Sessions) != 2 {
+			t.Errorf("unexpected first group: %+v", groups[0])
+		}
+		if groups[1].Folder != "/workspace/projB" || len(groups[1].Sessions) != 1 {
+			t.Errorf("unexpected second group: %+v", groups[1])
+		}
+	})
+}
+

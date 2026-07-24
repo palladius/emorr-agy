@@ -379,13 +379,14 @@ func FormatTitleAndDescription(rawTitle, desc, worktreeBranch string, isCron boo
 
 	var coloredDesc string
 	if cleanTitle != "" {
-		coloredDesc = "🏷️" + color.Colorize(cleanTitle, color.Yellow)
+		coloredDesc = color.Colorize(cleanTitle, color.Yellow) + "🏷️"
 		if desc != "" {
 			coloredDesc += " " + color.Colorize(desc, color.Cyan)
 		}
 	} else {
 		coloredDesc = color.Colorize(desc, color.Cyan)
 	}
+
 
 	if worktreeBranch != "" {
 		coloredDesc = "🌳 " + color.Colorize(worktreeBranch, color.Green) + " " + coloredDesc

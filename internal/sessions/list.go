@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -147,7 +148,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		hasPrintedSeparator := false
 		for _, s := range sessions {
 			if s.State == StateDeadArchived && !hasPrintedSeparator {
-				fmt.Fprintln(tw, "---\t---\t---\t---\t---\t---\t---\t---")
+				_ = tw.Flush()
+				fmt.Fprintln(w, color.Colorize("  --------------------------------------------------", color.DarkGray))
 				hasPrintedSeparator = true
 			}
 			emoji := formatStatus(s)
@@ -194,7 +196,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		hasPrintedSeparator := false
 		for _, s := range sessions {
 			if s.State == StateDeadArchived && !hasPrintedSeparator {
-				fmt.Fprintln(tw, "---   \t---\t---\t---\t---")
+				_ = tw.Flush()
+				fmt.Fprintln(w, color.Colorize("  --------------------------------------------------", color.DarkGray))
 				hasPrintedSeparator = true
 			}
 			emoji := formatStatus(s)
@@ -361,12 +364,25 @@ func ShortenSessionID(id string) string {
 }
 
 
+var (
+	multipleSpacesRe = regexp.MustCompile(`\s+`)
+	multipleDashesRe = regexp.MustCompile(`-{2,}`)
+)
+
+// CleanSynopsis collapses multiple spaces and repeated dashes into clean single characters.
+func CleanSynopsis(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = multipleSpacesRe.ReplaceAllString(s, " ")
+	s = multipleDashesRe.ReplaceAllString(s, "-")
+	return strings.TrimSpace(s)
+}
+
 // FormatTitleAndDescription builds colored description:
 // title (with [ and ] brackets removed) in Yellow prefixed with 🏷️ (no space after emoji),
 // followed by description in Cyan separated by a single space (no │ character).
 func FormatTitleAndDescription(rawTitle, desc, worktreeBranch string, isCron bool) string {
-	desc = strings.TrimSpace(desc)
-	desc = strings.ReplaceAll(desc, "\n", " ")
+	desc = CleanSynopsis(desc)
 	if isCron {
 		desc = "🔁 " + desc
 	}
@@ -465,14 +481,14 @@ func FindGitRoot(dir string) (repoRoot string, worktreeBranch string, relSubfold
 	return firstGit, "", firstRel
 }
 
-// FormatSubfolder cleans and formats a subfolder path, capping it to max 25 chars followed by .../
+// FormatSubfolder cleans and formats a subfolder path, capping it to max 20 chars followed by .../
 func FormatSubfolder(subfolder string) string {
 	if subfolder == "" {
 		return ""
 	}
 	clean := filepath.Clean(subfolder) + "/"
-	if len(clean) > 25 {
-		clean = clean[:22] + ".../"
+	if len(clean) > 20 {
+		clean = clean[:17] + ".../"
 	}
 	return "📁 " + color.Colorize(clean, color.Blue)
 }
@@ -539,7 +555,6 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 		return encoder.Encode(outputGroups)
 	}
 
-	tw := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
 	hasPrintedSeparator := false
 
 	for _, key := range groupOrder {
@@ -552,10 +567,13 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 		fmt.Fprintln(w, "")
 		fmt.Fprintln(w, color.Colorize(displayHeader, color.BoldWhite))
 
+		tw := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
+
 		if format == "long" {
 			for _, s := range g.Sessions {
 				if s.State == StateDeadArchived && !hasPrintedSeparator {
-					fmt.Fprintf(tw, "    ---   \t---\t---\t---\t---\t---\t---\t---\n")
+					_ = tw.Flush()
+					fmt.Fprintln(w, color.Colorize("    --------------------------------------------------", color.DarkGray))
 					hasPrintedSeparator = true
 				}
 				emoji := formatStatus(s)
@@ -592,7 +610,8 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 		} else { // short
 			for _, s := range g.Sessions {
 				if s.State == StateDeadArchived && !hasPrintedSeparator {
-					fmt.Fprintf(tw, "    ---   \t---\t---\t---\t---\n")
+					_ = tw.Flush()
+					fmt.Fprintln(w, color.Colorize("    --------------------------------------------------", color.DarkGray))
 					hasPrintedSeparator = true
 				}
 				emoji := formatStatus(s)
@@ -629,6 +648,7 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 
 	return nil
 }
+
 
 
 

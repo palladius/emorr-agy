@@ -638,6 +638,13 @@ func TestShortenSessionIDAndTitleFormat(t *testing.T) {
 			t.Errorf("expected truncated subfolder with .../, got %s", got)
 		}
 	})
+
+	t.Run("CleanSynopsis collapses multiple spaces and dashes", func(t *testing.T) {
+		got := CleanSynopsis("check this folder:     20260605---worktree--multiagent")
+		if got != "check this folder: 20260605-worktree-multiagent" {
+			t.Errorf("expected collapsed spaces and dashes, got %q", got)
+		}
+	})
 }
 
 

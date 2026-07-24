@@ -284,3 +284,30 @@ func TestClassifyDedupesMultipleFoldersPerConvID(t *testing.T) {
 		t.Errorf("expected 2 total sessions after dedup, got %d", len(sessions))
 	}
 }
+
+func TestResolveGeminiFolderWithJsonAndPaths(t *testing.T) {
+	mockFS := &MockFileSystem{
+		files: map[string][]byte{
+			"/home/ricc/.gemini/tmp/myhashfolder/chats/session-123.json": []byte(`{
+				"sessionId": "123",
+				"messages": [{"content": "file /home/ricc/git/my-awesome-project/main.go"}]
+			}`),
+		},
+		dirs: map[string][]os.DirEntry{
+			"/home/ricc/.gemini/tmp/myhashfolder/chats": {
+				MockDirEntry{name: "session-123.json", isDir: false},
+			},
+		},
+		stats: map[string]os.FileInfo{
+			"/home/ricc/git/my-awesome-project": MockFileInfo{name: "my-awesome-project", isDir: true},
+		},
+	}
+
+	engine := NewClassificationEngine(&MockTmuxRunner{}, mockFS, "/home/ricc")
+	resolved := engine.resolveGeminiFolder("myhashfolder", "/home/ricc/.gemini/tmp")
+
+	if resolved != "/home/ricc/git/my-awesome-project" {
+		t.Errorf("expected resolved folder /home/ricc/git/my-awesome-project, got %q", resolved)
+	}
+}
+

@@ -140,7 +140,7 @@ func (c *ClassificationEngine) buildPathHashTable() map[string]string {
 	for _, parent := range parentDirs {
 		var walk func(dir string, level int)
 		walk = func(dir string, level int) {
-			if level > 3 {
+			if level > 6 {
 				return
 			}
 			entries, err := c.fs.ReadDir(dir)
@@ -151,10 +151,11 @@ func (c *ClassificationEngine) buildPathHashTable() map[string]string {
 				if !e.IsDir() {
 					continue
 				}
-				if e.Name() == ".git" || e.Name() == "node_modules" {
+				name := e.Name()
+				if strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" || name == "dist" || name == "build" {
 					continue
 				}
-				absPath := filepath.Join(dir, e.Name())
+				absPath := filepath.Join(dir, name)
 				hash := fmt.Sprintf("%x", sha256.Sum256([]byte(absPath)))
 				c.pathHashTable[hash] = absPath
 				walk(absPath, level+1)
@@ -166,11 +167,51 @@ func (c *ClassificationEngine) buildPathHashTable() map[string]string {
 	return c.pathHashTable
 }
 
+// extractFolderFromPaths searches bytes for absolute paths starting with homeDir and returns the existing project directory.
+func (c *ClassificationEngine) extractFolderFromPaths(data []byte) string {
+	homeEscaped := regexp.QuoteMeta(c.homeDir)
+	pathRe := regexp.MustCompile(homeEscaped + `/([a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*)`)
+	matches := pathRe.FindAllString(string(data), -1)
+
+	counts := make(map[string]int)
+	for _, m := range matches {
+		// Clean and trim file components to find directory
+		dir := m
+		if fi, err := c.fs.Stat(dir); err != nil || !fi.IsDir() {
+			dir = filepath.Dir(dir)
+		}
+		for dir != c.homeDir && strings.HasPrefix(dir, c.homeDir) && dir != "/" {
+			if fi, err := c.fs.Stat(dir); err == nil && fi.IsDir() {
+				// Don't pick homeDir or parent categories like ~/git directly
+				if dir != filepath.Join(c.homeDir, "git") && dir != filepath.Join(c.homeDir, "obsidian") {
+					counts[dir]++
+				}
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+
+	var bestDir string
+	var maxCount int
+	for dir, count := range counts {
+		if count > maxCount || (count == maxCount && len(dir) > len(bestDir)) {
+			bestDir = dir
+			maxCount = count
+		}
+	}
+	return bestDir
+}
+
 // resolveGeminiFolder resolves a ~/.gemini/tmp/<folderName> to its real working directory.
 // It tries:
 // 1. If folderName is a SHA256 hash (64 hex chars): direct lookup in hash table
-// 2. Read chats/*.jsonl for projectHash field: lookup in hash table
-// 3. Basename candidates: ~/git/<name>, ~/<name>, ~/obsidian/<name>, ~/obsidian-pbt/<name>
+// 2. Read chats/*.json or chats/*.jsonl for projectHash field: lookup in hash table
+// 3. Extract file paths from chat/log files to find referenced project folder
+// 4. Basename candidates: ~/git/<name>, ~/<name>, ~/obsidian/<name>, ~/obsidian-pbt/<name>
 func (c *ClassificationEngine) resolveGeminiFolder(folderName, geminiTmpDir string) string {
 	hashTable := c.buildPathHashTable()
 
@@ -181,32 +222,44 @@ func (c *ClassificationEngine) resolveGeminiFolder(folderName, geminiTmpDir stri
 		}
 	}
 
-	// Strategy 2: Read projectHash from chats/*.jsonl
+	// Strategy 2 & 3: Read projectHash and paths from chats/*.json and chats/*.jsonl
 	chatsDir := filepath.Join(geminiTmpDir, folderName, "chats")
 	if chatEntries, err := c.fs.ReadDir(chatsDir); err == nil {
 		for _, ce := range chatEntries {
-			if !strings.HasSuffix(ce.Name(), ".jsonl") {
+			if !strings.HasSuffix(ce.Name(), ".json") && !strings.HasSuffix(ce.Name(), ".jsonl") {
 				continue
 			}
 			data, err := c.fs.ReadFile(filepath.Join(chatsDir, ce.Name()))
 			if err != nil {
 				continue
 			}
-			// Read just the first line
-			firstLine := strings.SplitN(string(data), "\n", 2)[0]
+
+			// Check for projectHash
 			var chatMeta struct {
 				ProjectHash string `json:"projectHash"`
 			}
-			if err := json.Unmarshal([]byte(firstLine), &chatMeta); err == nil && chatMeta.ProjectHash != "" {
+			if err := json.Unmarshal(data, &chatMeta); err == nil && chatMeta.ProjectHash != "" {
 				if path, ok := hashTable[chatMeta.ProjectHash]; ok {
 					return path
 				}
+			} else {
+				// Fallback line-by-line unmarshal for .jsonl
+				firstLine := strings.SplitN(string(data), "\n", 2)[0]
+				if err := json.Unmarshal([]byte(firstLine), &chatMeta); err == nil && chatMeta.ProjectHash != "" {
+					if path, ok := hashTable[chatMeta.ProjectHash]; ok {
+						return path
+					}
+				}
 			}
-			break // only need first chat file
+
+			// Fallback: extract paths from chat content
+			if extracted := c.extractFolderFromPaths(data); extracted != "" {
+				return extracted
+			}
 		}
 	}
 
-	// Strategy 3: Basename candidates
+	// Strategy 4: Basename candidates
 	for _, cand := range []string{
 		filepath.Join(c.homeDir, "git", folderName),
 		filepath.Join(c.homeDir, folderName),

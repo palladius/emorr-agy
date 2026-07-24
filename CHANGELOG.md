@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] - 2026-07-24
+
+### Fixed
+- **Gemini Session Folder Resolution**: Fixed folder resolution for Gemini CLI sessions by supporting `.json` chat file formats alongside `.jsonl`. Increased path hashtable recursion depth limit from 3 to 6 to index deeply nested repositories. Added fallback path extraction from chat/log file contents when `projectHash` lookup fails.
+
 ## [0.2.3] - 2026-07-24
 
 ### Fixed

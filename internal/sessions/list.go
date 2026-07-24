@@ -29,7 +29,9 @@ type ListOptions struct {
 	ActiveOnly    bool   // If true, show only active/running sessions
 	Folder        string // If set, filter sessions by folder prefix match
 	GroupByFolder bool   // If true, group output by directory/folder with emoji header
+	Limit         int    // If > 0, limit output to max N sessions
 }
+
 
 
 // ListSessions retrieves and prints the classified sessions to the provided writer.
@@ -100,6 +102,12 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		sessions = filtered
 	}
 
+	// Apply limit if set
+	if opts.Limit > 0 && len(sessions) > opts.Limit {
+		sessions = sessions[:opts.Limit]
+	}
+
+
 
 	format := opts.Format
 	if format == "" {
@@ -159,33 +167,11 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				ageColor = color.DarkGray
 			}
 
-			desc := strings.TrimSpace(s.Description)
-			desc = strings.ReplaceAll(desc, "\n", " ")
-			if s.IsCron {
-				desc = "🔁 " + desc
-			}
-			if len(desc) > 60 {
-				desc = desc[:57] + "..."
-			}
-
-			// Build colored description: title in Yellow with 🏷️, description in Cyan
-			var coloredDesc string
-			if s.Title != "" {
-				coloredDesc = "🏷️ " + color.Colorize(s.Title, color.Yellow)
-				if desc != "" {
-					coloredDesc += " │ " + color.Colorize(desc, color.Cyan)
-				}
-			} else {
-				coloredDesc = color.Colorize(desc, color.Cyan)
-			}
-			if s.WorktreeBranch != "" {
-				coloredDesc = "🌳 " + color.Colorize(s.WorktreeBranch, color.Green) + " " + coloredDesc
-			}
-
-			statusAndHarness := fmt.Sprintf("%s %s", emoji, harnessEmoji)
-			fmt.Fprintf(tw, "%s\t %s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			coloredDesc := FormatTitleAndDescription(s.Title, s.Description, s.WorktreeBranch, s.IsCron)
+			statusAndHarness := fmt.Sprintf("%s %s  ", emoji, harnessEmoji)
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				color.Colorize(statusAndHarness, color.Plain),
-				color.Colorize(s.ID, color.BoldWhite),
+				color.Colorize(ShortenSessionID(s.ID), color.BoldWhite),
 				color.Colorize(fmt.Sprintf("%3s", age), ageColor),
 				color.Colorize(folder, folderColor(s.Folder)),
 				color.Colorize(s.Harness, color.Plain),
@@ -228,32 +214,11 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				ageColor = color.DarkGray
 			}
 
-			desc := strings.TrimSpace(s.Description)
-			desc = strings.ReplaceAll(desc, "\n", " ")
-			if s.IsCron {
-				desc = "🔁 " + desc
-			}
-			if len(desc) > 60 {
-				desc = desc[:57] + "..."
-			}
+			coloredDesc := FormatTitleAndDescription(s.Title, s.Description, s.WorktreeBranch, s.IsCron)
 
-			// Build colored description: title in Yellow with 🏷️, description in Cyan
-			var coloredDesc string
-			if s.Title != "" {
-				coloredDesc = "🏷️ " + color.Colorize(s.Title, color.Yellow)
-				if desc != "" {
-					coloredDesc += " │ " + color.Colorize(desc, color.Cyan)
-				}
-			} else {
-				coloredDesc = color.Colorize(desc, color.Cyan)
-			}
-			if s.WorktreeBranch != "" {
-				coloredDesc = "🌳 " + color.Colorize(s.WorktreeBranch, color.Green) + " " + coloredDesc
-			}
-
-			fmt.Fprintf(tw, "%s %s\t%s\t%s\t%s\t%s\n",
+			fmt.Fprintf(tw, "%s %s  \t%s\t%s\t%s\t%s\n",
 				emoji, harnessEmoji,
-				color.Colorize(s.ID, color.BoldWhite),
+				color.Colorize(ShortenSessionID(s.ID), color.BoldWhite),
 				color.Colorize(fmt.Sprintf("%3s", age), ageColor),
 				color.Colorize(folder, folderColor(s.Folder)),
 				coloredDesc,
@@ -261,6 +226,7 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 		}
 		tw.Flush()
 	}
+
 
 	return nil
 }
@@ -383,6 +349,120 @@ func FormatAge(t time.Time) string {
 	return fmt.Sprintf("%dd", days)
 }
 
+// ShortenSessionID chops UUIDs (36-char 5-part hyphenated strings) to their first two components (e.g. 1dec76de-548e).
+// Non-UUID session IDs are returned as-is.
+func ShortenSessionID(id string) string {
+	parts := strings.Split(id, "-")
+	if len(parts) == 5 && len(id) == 36 {
+		return parts[0] + "-" + parts[1]
+	}
+	return id
+}
+
+
+// FormatTitleAndDescription builds colored description:
+// title (with [ and ] brackets removed) in Yellow prefixed with 🏷️ (no space after emoji),
+// followed by description in Cyan separated by a single space (no │ character).
+func FormatTitleAndDescription(rawTitle, desc, worktreeBranch string, isCron bool) string {
+	desc = strings.TrimSpace(desc)
+	desc = strings.ReplaceAll(desc, "\n", " ")
+	if isCron {
+		desc = "🔁 " + desc
+	}
+	if len(desc) > 60 {
+		desc = desc[:57] + "..."
+	}
+
+	cleanTitle := strings.ReplaceAll(rawTitle, "[", "")
+	cleanTitle = strings.ReplaceAll(cleanTitle, "]", "")
+	cleanTitle = strings.TrimSpace(cleanTitle)
+
+	var coloredDesc string
+	if cleanTitle != "" {
+		coloredDesc = "🏷️" + color.Colorize(cleanTitle, color.Yellow)
+		if desc != "" {
+			coloredDesc += " " + color.Colorize(desc, color.Cyan)
+		}
+	} else {
+		coloredDesc = color.Colorize(desc, color.Cyan)
+	}
+
+	if worktreeBranch != "" {
+		coloredDesc = "🌳 " + color.Colorize(worktreeBranch, color.Green) + " " + coloredDesc
+	}
+
+	return coloredDesc
+}
+
+// FindGitRoot returns (repoRoot, worktreeBranch, relSubfolder) for a given directory path.
+// If the path is inside a git worktree (.worktrees/<branch>/... or worktrees/<branch>/...),
+// repoRoot is the base git repository root, worktreeBranch is <branch>, and relSubfolder is any path inside the worktree.
+func FindGitRoot(dir string) (repoRoot string, worktreeBranch string, relSubfolder string) {
+	if dir == "" {
+		return "", "", ""
+	}
+	cleanDir := filepath.Clean(dir)
+	curr := cleanDir
+	var firstGit string
+	var firstRel string
+
+	for {
+		gitPath := filepath.Join(curr, ".git")
+		if _, err := os.Stat(gitPath); err == nil {
+			if firstGit == "" {
+				firstGit = curr
+				rel, err := filepath.Rel(curr, cleanDir)
+				if err == nil && rel != "." {
+					firstRel = rel
+				} else {
+					firstRel = ""
+				}
+			}
+		}
+		parent := filepath.Dir(curr)
+		if parent == curr || parent == "." || parent == "/" {
+			break
+		}
+		curr = parent
+	}
+
+	if firstGit == "" {
+		return cleanDir, "", ""
+	}
+
+	parts := strings.Split(firstGit, string(filepath.Separator))
+	for i, p := range parts {
+		if (p == ".worktrees" || p == "worktrees") && i > 0 && i+1 < len(parts) {
+			repo := strings.Join(parts[:i], string(filepath.Separator))
+			branch := parts[i+1]
+			rel := firstRel
+			if i+2 < len(parts) {
+				subInWt := strings.Join(parts[i+2:], "/")
+				if firstRel != "" {
+					rel = subInWt + "/" + firstRel
+				} else {
+					rel = subInWt
+				}
+			}
+			return repo, branch, rel
+		}
+	}
+
+	if firstRel != "" {
+		relParts := strings.Split(firstRel, string(filepath.Separator))
+		if len(relParts) >= 2 && (relParts[0] == ".worktrees" || relParts[0] == "worktrees") {
+			branch := relParts[1]
+			rel := ""
+			if len(relParts) > 2 {
+				rel = strings.Join(relParts[2:], "/")
+			}
+			return firstGit, branch, rel
+		}
+	}
+
+	return firstGit, "", firstRel
+}
+
 type FolderGroup struct {
 	Folder        string    `json:"folder"`
 	DisplayFolder string    `json:"display_folder"`
@@ -395,10 +475,12 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 	groupsMap := make(map[string]*FolderGroup)
 
 	for _, s := range sessions {
-		folderKey := s.Folder
-		if folderKey != "" {
-			folderKey = filepath.Clean(folderKey)
+		repoRoot, worktreeBranch, subfolder := FindGitRoot(s.Folder)
+		folderKey := repoRoot
+		if worktreeBranch != "" {
+			folderKey = filepath.Join(repoRoot, ".worktrees", worktreeBranch)
 		}
+
 		g, exists := groupsMap[folderKey]
 		if !exists {
 			displayFolder := "-"
@@ -416,7 +498,10 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 			groupsMap[folderKey] = g
 			groupOrder = append(groupOrder, folderKey)
 		}
-		g.Sessions = append(g.Sessions, s)
+
+		sCopy := s
+		sCopy.Subfolder = subfolder
+		g.Sessions = append(g.Sessions, sCopy)
 		if s.LastActivity.After(g.LastActivity) {
 			g.LastActivity = s.LastActivity
 		}
@@ -440,19 +525,38 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 		return nil
 	}
 
-	// For text formats (short/long), print each group header and indented sessions
+	// For text formats (short/long), print group header and session rows
 	for i, g := range groups {
 		if i > 0 {
 			fmt.Fprintln(w)
 		}
-		fmt.Fprintln(w, color.Colorize(g.DisplayFolder, folderColor(g.Folder)))
+
+		headerStr := g.DisplayFolder
+		if strings.Contains(g.Folder, ".worktrees/") || strings.Contains(g.Folder, "worktrees/") {
+			parts := strings.Split(g.Folder, string(filepath.Separator))
+			for idx, p := range parts {
+				if (p == ".worktrees" || p == "worktrees") && idx+1 < len(parts) {
+					baseRepo := strings.Join(parts[:idx], string(filepath.Separator))
+					baseRepoDisplay := strings.ReplaceAll(baseRepo, homeDir, "~")
+					branch := parts[idx+1]
+					headerStr = fmt.Sprintf("📂 %s 🌳 %s",
+						color.Colorize(baseRepoDisplay, folderColor(baseRepo)),
+						color.Colorize(branch, color.Purple),
+					)
+					break
+				}
+			}
+		} else {
+			headerStr = color.Colorize(g.DisplayFolder, folderColor(g.Folder))
+		}
+		fmt.Fprintln(w, headerStr)
 
 		tw := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
 		hasPrintedSeparator := false
 		if format == "long" {
 			for _, s := range g.Sessions {
 				if s.State == StateDeadArchived && !hasPrintedSeparator {
-					fmt.Fprintln(tw, "  ---\t---\t---\t---\t---\t---\t---\t---")
+					fmt.Fprintf(tw, "    ---\t---\t---\t---\t---\t---\t---\t---\n")
 					hasPrintedSeparator = true
 				}
 				emoji := formatStatus(s)
@@ -466,34 +570,23 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 					ageColor = color.DarkGray
 				}
 
-				desc := strings.TrimSpace(s.Description)
-				desc = strings.ReplaceAll(desc, "\n", " ")
-				if s.IsCron {
-					desc = "🔁 " + desc
-				}
-				if len(desc) > 60 {
-					desc = desc[:57] + "..."
+				subfolderStr := ""
+				if s.Subfolder != "" {
+					subfolderStr = "📁 " + color.Colorize(filepath.Clean(s.Subfolder)+"/", color.Cyan)
 				}
 
-				var coloredDesc string
-				if s.Title != "" {
-					coloredDesc = "🏷️ " + color.Colorize(s.Title, color.Yellow)
-					if desc != "" {
-						coloredDesc += " │ " + color.Colorize(desc, color.Cyan)
-					}
-				} else {
-					coloredDesc = color.Colorize(desc, color.Cyan)
-				}
-				if s.WorktreeBranch != "" {
-					coloredDesc = "🌳 " + color.Colorize(s.WorktreeBranch, color.Green) + " " + coloredDesc
-				}
+				shortID := ShortenSessionID(s.ID)
+				coloredID := color.Colorize(shortID, sessionIDColor(s))
+				coloredAge := color.Colorize(fmt.Sprintf("%3s", age), ageColor)
+				coloredDesc := FormatTitleAndDescription(s.Title, s.Description, "", s.IsCron)
 
-				statusAndHarness := fmt.Sprintf("  %s %s", emoji, harnessEmoji)
-				fmt.Fprintf(tw, "%s\t %s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-					color.Colorize(statusAndHarness, color.Plain),
-					color.Colorize(s.ID, color.BoldWhite),
-					color.Colorize(fmt.Sprintf("%3s", age), ageColor),
-					color.Colorize("-", color.DarkGray),
+				statusAndHarness := fmt.Sprintf("    %s %s  ", emoji, harnessEmoji)
+
+				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+					statusAndHarness,
+					coloredID,
+					coloredAge,
+					subfolderStr,
 					color.Colorize(s.Harness, color.Plain),
 					color.Colorize(strconv.Itoa(s.ProcessCount), color.Plain),
 					color.Colorize(s.ResumeCommand, color.Plain),
@@ -503,7 +596,7 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 		} else { // short
 			for _, s := range g.Sessions {
 				if s.State == StateDeadArchived && !hasPrintedSeparator {
-					fmt.Fprintln(tw, "  ---   \t---\t---\t---\t---")
+					fmt.Fprintf(tw, "    ---   \t---\t---\t---\t---\n")
 					hasPrintedSeparator = true
 				}
 				emoji := formatStatus(s)
@@ -517,40 +610,32 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 					ageColor = color.DarkGray
 				}
 
-				desc := strings.TrimSpace(s.Description)
-				desc = strings.ReplaceAll(desc, "\n", " ")
-				if s.IsCron {
-					desc = "🔁 " + desc
-				}
-				if len(desc) > 60 {
-					desc = desc[:57] + "..."
+				subfolderStr := ""
+				if s.Subfolder != "" {
+					subfolderStr = "📁 " + color.Colorize(filepath.Clean(s.Subfolder)+"/", color.Cyan)
 				}
 
-				var coloredDesc string
-				if s.Title != "" {
-					coloredDesc = "🏷️ " + color.Colorize(s.Title, color.Yellow)
-					if desc != "" {
-						coloredDesc += " │ " + color.Colorize(desc, color.Cyan)
-					}
-				} else {
-					coloredDesc = color.Colorize(desc, color.Cyan)
-				}
-				if s.WorktreeBranch != "" {
-					coloredDesc = "🌳 " + color.Colorize(s.WorktreeBranch, color.Green) + " " + coloredDesc
-				}
+				shortID := ShortenSessionID(s.ID)
+				coloredID := color.Colorize(shortID, sessionIDColor(s))
+				coloredAge := color.Colorize(fmt.Sprintf("%3s", age), ageColor)
+				coloredDesc := FormatTitleAndDescription(s.Title, s.Description, "", s.IsCron)
 
-				fmt.Fprintf(tw, "  %s %s\t%s\t%s\t%s\t%s\n",
-					emoji, harnessEmoji,
-					color.Colorize(s.ID, color.BoldWhite),
-					color.Colorize(fmt.Sprintf("%3s", age), ageColor),
-					color.Colorize("-", color.DarkGray),
+				statusAndHarness := fmt.Sprintf("    %s %s  ", emoji, harnessEmoji)
+
+				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+					statusAndHarness,
+					coloredID,
+					coloredAge,
+					subfolderStr,
 					coloredDesc,
 				)
 			}
 		}
-		tw.Flush()
+		_ = tw.Flush()
 	}
 
 	return nil
 }
+
+
 

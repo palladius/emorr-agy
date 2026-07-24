@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
 
 func TestListSessionsFormats(t *testing.T) {
 	mockTmux := &MockTmuxRunner{
@@ -563,4 +565,81 @@ func TestListSessionsGroupByFolder(t *testing.T) {
 		}
 	})
 }
+
+func TestListSessionsLimit(t *testing.T) {
+	mockTmux := &MockTmuxRunner{
+		sessions: []TmuxSession{
+			{Name: "emagy-sess1", Path: "/workspace/projA", Attached: true, Windows: 1},
+			{Name: "emagy-sess2", Path: "/workspace/projA", Attached: true, Windows: 1},
+			{Name: "emgem-sess3", Path: "/workspace/projB", Attached: true, Windows: 1},
+		},
+	}
+	mockFS := &MockFileSystem{files: map[string][]byte{}}
+	engine := NewClassificationEngine(mockTmux, mockFS, "/home/ricc")
+
+	var buf bytes.Buffer
+	err := ListSessions(&buf, engine, ListOptions{Format: "json", All: true, Limit: 2})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var sessionsList []Session
+	if err := json.Unmarshal(buf.Bytes(), &sessionsList); err != nil {
+		t.Fatalf("failed to parse JSON: %v", err)
+	}
+
+	if len(sessionsList) != 2 {
+		t.Errorf("expected limit of 2 sessions, got %d", len(sessionsList))
+	}
+}
+
+func TestFindGitRoot(t *testing.T) {
+	tempDir := t.TempDir()
+	gitDir := filepath.Join(tempDir, "myrepo")
+	subDir := filepath.Join(gitDir, "skills", "sub")
+	if err := os.MkdirAll(filepath.Join(gitDir, ".git"), 0755); err != nil {
+		t.Fatalf("failed to create fake .git: %v", err)
+	}
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatalf("failed to create subDir: %v", err)
+	}
+
+	repoRoot, branch, subfolder := FindGitRoot(subDir)
+	if repoRoot != gitDir {
+		t.Errorf("expected repoRoot %s, got %s", gitDir, repoRoot)
+	}
+	if branch != "" {
+		t.Errorf("expected empty branch, got %s", branch)
+	}
+	if subfolder != filepath.Join("skills", "sub") {
+		t.Errorf("expected subfolder skills/sub, got %s", subfolder)
+	}
+}
+
+
+func TestShortenSessionIDAndTitleFormat(t *testing.T) {
+	t.Run("Shorten UUID to first two hyphenated parts", func(t *testing.T) {
+		got := ShortenSessionID("1dec76de-548e-4a12-8466-be1b856ed418")
+		if got != "1dec76de-548e" {
+			t.Errorf("expected 1dec76de-548e, got %s", got)
+		}
+	})
+
+	t.Run("Format title removes brackets and pipe separator", func(t *testing.T) {
+		got := FormatTitleAndDescription("[CRE26 p3002] Title", "My desc", "", false)
+		if strings.Contains(got, "[CRE26") || strings.Contains(got, "p3002]") || strings.Contains(got, "│") {
+			t.Errorf("title formatting should remove [ ] and │, got %s", got)
+		}
+		if !strings.Contains(got, "CRE26 p3002 Title") || !strings.Contains(got, "My desc") {
+			t.Errorf("expected clean title and desc in output, got %s", got)
+		}
+	})
+}
+
+
+
+
+
+
+
 

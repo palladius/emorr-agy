@@ -171,7 +171,8 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 			}
 
 			coloredDesc := FormatTitleAndDescription(s.Title, s.Description, s.WorktreeBranch, s.IsCron)
-			statusAndHarness := fmt.Sprintf("%s %s  ", emoji, harnessEmoji)
+			statusAndHarness := fmt.Sprintf("%s%s   ", emoji, harnessEmoji)
+
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				color.Colorize(statusAndHarness, color.Plain),
 				color.Colorize(ShortenSessionID(s.ID), color.BoldWhite),
@@ -220,8 +221,9 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 
 			coloredDesc := FormatTitleAndDescription(s.Title, s.Description, s.WorktreeBranch, s.IsCron)
 
-			fmt.Fprintf(tw, "%s %s  \t%s\t%s\t%s\t%s\n",
+			fmt.Fprintf(tw, "%s%s   \t%s\t%s\t%s\t%s\n",
 				emoji, harnessEmoji,
+
 				color.Colorize(ShortenSessionID(s.ID), color.BoldWhite),
 				color.Colorize(fmt.Sprintf("%3s", age), ageColor),
 				color.Colorize(folder, folderColor(s.Folder)),
@@ -594,7 +596,8 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 				coloredAge := color.Colorize(fmt.Sprintf("%3s", age), ageColor)
 				coloredDesc := FormatTitleAndDescription(s.Title, s.Description, "", s.IsCron)
 
-				statusAndHarness := fmt.Sprintf("    %s %s  ", emoji, harnessEmoji)
+				statusAndHarness := fmt.Sprintf("    %s%s   ", emoji, harnessEmoji)
+
 
 				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 					statusAndHarness,
@@ -632,7 +635,8 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 				coloredAge := color.Colorize(fmt.Sprintf("%3s", age), ageColor)
 				coloredDesc := FormatTitleAndDescription(s.Title, s.Description, "", s.IsCron)
 
-				statusAndHarness := fmt.Sprintf("    %s %s  ", emoji, harnessEmoji)
+				statusAndHarness := fmt.Sprintf("    %s%s   ", emoji, harnessEmoji)
+
 
 				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
 					statusAndHarness,

@@ -572,8 +572,9 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 
 				subfolderStr := ""
 				if s.Subfolder != "" {
-					subfolderStr = "📁 " + color.Colorize(filepath.Clean(s.Subfolder)+"/", color.Cyan)
+					subfolderStr = "📁 " + color.Colorize(filepath.Clean(s.Subfolder)+"/", color.Blue)
 				}
+
 
 				shortID := ShortenSessionID(s.ID)
 				coloredID := color.Colorize(shortID, sessionIDColor(s))
@@ -612,8 +613,9 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 
 				subfolderStr := ""
 				if s.Subfolder != "" {
-					subfolderStr = "📁 " + color.Colorize(filepath.Clean(s.Subfolder)+"/", color.Cyan)
+					subfolderStr = "📁 " + color.Colorize(filepath.Clean(s.Subfolder)+"/", color.Blue)
 				}
+
 
 				shortID := ShortenSessionID(s.ID)
 				coloredID := color.Colorize(shortID, sessionIDColor(s))

@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] - 2026-07-24
+
+### Fixed
+- **Subfolder Color**: Changed horizontal subfolder text color from Cyan to Blue (`color.Blue`) in `emorr-agy sessions list` to eliminate visual conflict with titleless session descriptions rendered in Cyan.
+
 ## [0.2.4] - 2026-07-24
+
 
 ### Added
 - **Horizontal Parametric Subfolder Display**: In `emorr-agy sessions list`, subfolders (e.g. `📁 casalborsetti-cre-app/`) are now displayed horizontally on each session row right after the age column in Cyan. Empty/root paths omit the subfolder display. Worktrees are cleanly integrated into group headers (`📂 ~/path/to/repo 🌳 branch-name`).

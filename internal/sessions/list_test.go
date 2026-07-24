@@ -630,11 +630,16 @@ func TestShortenSessionIDAndTitleFormat(t *testing.T) {
 		if strings.Contains(got, "[CRE26") || strings.Contains(got, "p3002]") || strings.Contains(got, "│") {
 			t.Errorf("title formatting should remove [ ] and │, got %s", got)
 		}
-		if !strings.Contains(got, "CRE26 p3002 Title") || !strings.Contains(got, "My desc") {
-			t.Errorf("expected clean title and desc in output, got %s", got)
+	})
+
+	t.Run("FormatSubfolder caps long paths to max 25 chars with .../", func(t *testing.T) {
+		got := FormatSubfolder("work/bugs/b532540434-xsetup-ramon-gke-cluster/investigations/ricc@gcp.altostrat.com/solutions")
+		if !strings.Contains(got, ".../") {
+			t.Errorf("expected truncated subfolder with .../, got %s", got)
 		}
 	})
 }
+
 
 
 

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -464,6 +465,18 @@ func FindGitRoot(dir string) (repoRoot string, worktreeBranch string, relSubfold
 	return firstGit, "", firstRel
 }
 
+// FormatSubfolder cleans and formats a subfolder path, capping it to max 25 chars followed by .../
+func FormatSubfolder(subfolder string) string {
+	if subfolder == "" {
+		return ""
+	}
+	clean := filepath.Clean(subfolder) + "/"
+	if len(clean) > 25 {
+		clean = clean[:22] + ".../"
+	}
+	return "📁 " + color.Colorize(clean, color.Blue)
+}
+
 type FolderGroup struct {
 	Folder        string    `json:"folder"`
 	DisplayFolder string    `json:"display_folder"`
@@ -500,64 +513,49 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 			groupOrder = append(groupOrder, folderKey)
 		}
 
-		sCopy := s
-		sCopy.Subfolder = subfolder
-		g.Sessions = append(g.Sessions, sCopy)
 		if s.LastActivity.After(g.LastActivity) {
 			g.LastActivity = s.LastActivity
 		}
+
+		sCopy := s
+		sCopy.WorktreeBranch = worktreeBranch
+		sCopy.Subfolder = subfolder
+		g.Sessions = append(g.Sessions, sCopy)
 	}
 
-	var groups []FolderGroup
-	for _, key := range groupOrder {
-		groups = append(groups, *groupsMap[key])
-	}
+	sort.Slice(groupOrder, func(i, j int) bool {
+		gI := groupsMap[groupOrder[i]]
+		gJ := groupsMap[groupOrder[j]]
+		return gI.LastActivity.After(gJ.LastActivity)
+	})
 
 	if format == "json" {
-		data, err := json.MarshalIndent(groups, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
+		var outputGroups []FolderGroup
+		for _, key := range groupOrder {
+			outputGroups = append(outputGroups, *groupsMap[key])
 		}
-		_, err = w.Write(data)
-		if err != nil {
-			return err
-		}
-		_, _ = w.Write([]byte("\n"))
-		return nil
+		encoder := json.NewEncoder(w)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(outputGroups)
 	}
 
-	// For text formats (short/long), print group header and session rows
-	for i, g := range groups {
-		if i > 0 {
-			fmt.Fprintln(w)
+	tw := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
+	hasPrintedSeparator := false
+
+	for _, key := range groupOrder {
+		g := groupsMap[key]
+		displayHeader := g.DisplayFolder
+		if len(g.Sessions) > 0 && g.Sessions[0].WorktreeBranch != "" {
+			displayHeader += " 🌳 " + color.Colorize(g.Sessions[0].WorktreeBranch, color.Green)
 		}
 
-		headerStr := g.DisplayFolder
-		if strings.Contains(g.Folder, ".worktrees/") || strings.Contains(g.Folder, "worktrees/") {
-			parts := strings.Split(g.Folder, string(filepath.Separator))
-			for idx, p := range parts {
-				if (p == ".worktrees" || p == "worktrees") && idx+1 < len(parts) {
-					baseRepo := strings.Join(parts[:idx], string(filepath.Separator))
-					baseRepoDisplay := strings.ReplaceAll(baseRepo, homeDir, "~")
-					branch := parts[idx+1]
-					headerStr = fmt.Sprintf("📂 %s 🌳 %s",
-						color.Colorize(baseRepoDisplay, folderColor(baseRepo)),
-						color.Colorize(branch, color.Purple),
-					)
-					break
-				}
-			}
-		} else {
-			headerStr = color.Colorize(g.DisplayFolder, folderColor(g.Folder))
-		}
-		fmt.Fprintln(w, headerStr)
+		fmt.Fprintln(w, "")
+		fmt.Fprintln(w, color.Colorize(displayHeader, color.BoldWhite))
 
-		tw := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
-		hasPrintedSeparator := false
 		if format == "long" {
 			for _, s := range g.Sessions {
 				if s.State == StateDeadArchived && !hasPrintedSeparator {
-					fmt.Fprintf(tw, "    ---\t---\t---\t---\t---\t---\t---\t---\n")
+					fmt.Fprintf(tw, "    ---   \t---\t---\t---\t---\t---\t---\t---\n")
 					hasPrintedSeparator = true
 				}
 				emoji := formatStatus(s)
@@ -571,11 +569,7 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 					ageColor = color.DarkGray
 				}
 
-				subfolderStr := ""
-				if s.Subfolder != "" {
-					subfolderStr = "📁 " + color.Colorize(filepath.Clean(s.Subfolder)+"/", color.Blue)
-				}
-
+				subfolderStr := FormatSubfolder(s.Subfolder)
 
 				shortID := ShortenSessionID(s.ID)
 				coloredID := color.Colorize(shortID, sessionIDColor(s))
@@ -612,11 +606,7 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 					ageColor = color.DarkGray
 				}
 
-				subfolderStr := ""
-				if s.Subfolder != "" {
-					subfolderStr = "📁 " + color.Colorize(filepath.Clean(s.Subfolder)+"/", color.Blue)
-				}
-
+				subfolderStr := FormatSubfolder(s.Subfolder)
 
 				shortID := ShortenSessionID(s.ID)
 				coloredID := color.Colorize(shortID, sessionIDColor(s))

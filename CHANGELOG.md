@@ -8,8 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.9] - 2026-07-24
 
 ### Fixed
+- **Group-Isolated Tabwriter Alignment**: Instantiated tabwriter per folder group instead of sharing a global tabwriter across all groups, preventing long subfolder paths in one repository from creating huge empty tab gaps in other repositories.
+- **Subfolder Truncation**: Capped horizontal subfolder display paths in `emorr-agy sessions list` to a maximum of 20 characters (followed by `.../`).
 - **Synopsis Cleanup (`CleanSynopsis`)**: Added regex cleaning to collapse multiple consecutive spaces (`\s+`) and repeated dashes (`-{2,}`) into clean single spaces and dashes in session descriptions.
 - **Archived Separator Formatting**: Flushed tabwriter buffer before rendering the dark gray archived sessions divider line (`--------------------------------------------------`) to prevent tabwriter from stretching `---` across wide column gaps.
+
 
 ## [0.2.8] - 2026-07-24
 

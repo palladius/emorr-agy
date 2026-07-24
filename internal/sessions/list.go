@@ -558,8 +558,6 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 		return encoder.Encode(outputGroups)
 	}
 
-	hasPrintedSeparator := false
-
 	for _, key := range groupOrder {
 		g := groupsMap[key]
 		displayHeader := g.DisplayFolder
@@ -574,11 +572,6 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 
 		if format == "long" {
 			for _, s := range g.Sessions {
-				if s.State == StateDeadArchived && !hasPrintedSeparator {
-					_ = tw.Flush()
-					fmt.Fprintln(w, color.Colorize("    --------------------------------------------------", color.DarkGray))
-					hasPrintedSeparator = true
-				}
 				emoji := formatStatus(s)
 				harnessEmoji := getEmojiForHarness(s.Harness)
 				age := FormatAge(s.LastActivity)
@@ -598,7 +591,6 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 				coloredDesc := FormatTitleAndDescription(s.Title, s.Description, "", s.IsCron)
 
 				statusAndHarness := fmt.Sprintf("    %s%s   ", emoji, harnessEmoji)
-
 
 				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 					statusAndHarness,
@@ -613,11 +605,6 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 			}
 		} else { // short
 			for _, s := range g.Sessions {
-				if s.State == StateDeadArchived && !hasPrintedSeparator {
-					_ = tw.Flush()
-					fmt.Fprintln(w, color.Colorize("    --------------------------------------------------", color.DarkGray))
-					hasPrintedSeparator = true
-				}
 				emoji := formatStatus(s)
 				harnessEmoji := getEmojiForHarness(s.Harness)
 				age := FormatAge(s.LastActivity)
@@ -637,7 +624,6 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 				coloredDesc := FormatTitleAndDescription(s.Title, s.Description, "", s.IsCron)
 
 				statusAndHarness := fmt.Sprintf("    %s%s   ", emoji, harnessEmoji)
-
 
 				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
 					statusAndHarness,
@@ -653,6 +639,7 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 
 	return nil
 }
+
 
 
 

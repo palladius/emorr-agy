@@ -18,6 +18,7 @@ import (
 	"github.com/palladius/emorr-agy/internal/color"
 	"github.com/palladius/emorr-agy/internal/gemini"
 	"github.com/palladius/emorr-agy/internal/logger"
+	"github.com/palladius/emorr-agy/internal/remoteagy"
 	"github.com/palladius/emorr-agy/internal/sessions"
 	"github.com/palladius/emorr-agy/internal/telegram"
 )
@@ -1225,6 +1226,10 @@ func runServer() error {
 	}
 
 	logger.Infof("Server started (v%s) with PID %d, listening to Telegram...", Version, currentPID)
+
+	// Initialize remote agy concierge
+	initRemoteAgyConcierge()
+
 	sendStartupNotification()
 
 	offset := 0
@@ -1315,6 +1320,29 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 	}
 
 	logger.Infof("Routing command message from chat %d: %q", chatID, text)
+
+	// Remote AGY: if attached to a session, forward input instead of routing commands
+	if remoteAgyConcierge != nil {
+		mode, attachedName := remoteAgyConcierge.GetState()
+
+		if mode == remoteagy.ModeAttached && attachedName != "" {
+			// Check for escape commands first
+			switch strings.ToLower(text) {
+			case "/menu", "menu":
+				remoteAgyConcierge.DetachSession()
+				return sendConciergeMenu(botToken, chatID)
+			default:
+				// Forward text to the attached tmux session
+				if err := remoteAgyConcierge.SendInput(text); err != nil {
+					_ = telegram.SendTelegramMessageToChat(botToken, chatID,
+						fmt.Sprintf("⚠️ Failed to send input: %v", err))
+				} else {
+					logger.Infof("Forwarded input to session %q: %q", attachedName, text)
+				}
+				return nil
+			}
+		}
+	}
 
 	switch {
 	case strings.HasPrefix(text, "/status") || text == "status":
@@ -1541,6 +1569,9 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 	case strings.ToLower(text) == "ping" || text == "/ping":
 		_ = telegram.SendTelegramMessageToChat(botToken, chatID, "🏓 Pong!")
 
+	case strings.HasPrefix(text, "/agy") || text == "agy":
+		return sendConciergeMenu(botToken, chatID)
+
 	default:
 		// Unknown text/command
 		helpMsg := "❌ *Command not recognized.*\n\n📡 *Emorr-Agy Bot Help*\n\nAvailable commands:\n• `/status` - Show system, tmux, and thread status\n• `/monitor` - Show detailed active threads\n• `/list` - Show active sessions waiting on user interaction\n• `/listall` - Show the last 5 sessions of any state\n• `/new [harness] [query...]` - Spawn a new tmux session running a harness\n• `/restart` - Restart the background bot server"
@@ -1597,6 +1628,10 @@ func processCallbackQuery(botToken string, cb telegram.TelegramCallbackQuery) er
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return err
+	}
+
+	if strings.HasPrefix(data, "ragy:") {
+		return processRemoteAgyCallback(botToken, chatID, messageID, data)
 	}
 
 	if strings.HasPrefix(data, "menu:") {
@@ -1967,3 +2002,309 @@ func runCheck() error {
 
 	return nil
 }
+
+// =============================================================================
+// Remote AGY Concierge Integration
+// =============================================================================
+
+// remoteAgyConcierge is the global concierge for remote agy sessions.
+// Initialized in initRemoteAgyConcierge() during server startup.
+var remoteAgyConcierge *remoteagy.Concierge
+
+// remoteAgyPollers tracks active output pollers by session name.
+var remoteAgyPollers = make(map[string]*remoteagy.Poller)
+
+// initRemoteAgyConcierge loads the YAML config and initializes the concierge.
+// Non-fatal: if config loading fails, remote agy is simply disabled.
+func initRemoteAgyConcierge() {
+	cfg, err := remoteagy.LoadConfig()
+	if err != nil {
+		logger.Infof("Remote AGY disabled: %v", err)
+		return
+	}
+
+	remoteAgyConcierge = remoteagy.NewConcierge(cfg)
+
+	// Discover existing remote-agy-* tmux sessions from previous runs
+	existingSessions, err := remoteagy.ListRemoteSessions()
+	if err != nil {
+		logger.Errorf("Failed to discover existing sessions: %v", err)
+	} else {
+		for _, name := range existingSessions {
+			folder := findFolderForSession(cfg, name)
+			remoteAgyConcierge.Sessions[name] = &remoteagy.RemoteSession{
+				Name:      name,
+				Folder:    folder,
+				State:     remoteagy.SessionRunning,
+				StartedAt: time.Now(),
+			}
+			logger.Infof("Discovered existing remote session: %s", name)
+		}
+	}
+
+	logger.Infof("Remote AGY concierge initialized with %d folders, %d active sessions",
+		len(cfg.Folders), len(remoteAgyConcierge.Sessions))
+}
+
+// findFolderForSession matches a tmux session name to a folder config.
+func findFolderForSession(cfg *remoteagy.Config, sessionName string) remoteagy.FolderConfig {
+	for _, f := range cfg.Folders {
+		if remoteagy.SanitizeSessionName(f.Name) == sessionName {
+			return f
+		}
+	}
+	return remoteagy.FolderConfig{Name: sessionName, Path: "unknown"}
+}
+
+// sendConciergeMenu sends the concierge menu to the given chat.
+func sendConciergeMenu(botToken string, chatID int64) error {
+	if remoteAgyConcierge == nil {
+		return telegram.SendTelegramMessageToChat(botToken, chatID,
+			"⚠️ Remote AGY is not configured. Create `~/.emorr-agy-folders.yaml`.")
+	}
+
+	markup, err := remoteagy.BuildConciergeKeyboard(remoteAgyConcierge.Config, remoteAgyConcierge.Sessions)
+	if err != nil {
+		return telegram.SendTelegramMessageToChat(botToken, chatID,
+			fmt.Sprintf("⚠️ Error building concierge menu: %v", err))
+	}
+
+	msg := fmt.Sprintf("🤖 *Remote AGY Concierge*\nActive sessions: %d/%d\n\nSelect a folder to launch agy, or resume an active session:",
+		remoteAgyConcierge.ActiveSessionCount(), remoteagy.MaxConcurrentSessions)
+
+	return telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, msg, markup)
+}
+
+// processRemoteAgyCallback handles all ragy: prefixed callback queries.
+func processRemoteAgyCallback(botToken string, chatID int64, messageID int, data string) error {
+	if remoteAgyConcierge == nil {
+		return telegram.SendTelegramMessageToChat(botToken, chatID, "⚠️ Remote AGY is not configured.")
+	}
+
+	parts := strings.SplitN(data, ":", 3)
+	if len(parts) < 2 {
+		return nil
+	}
+	action := parts[1]
+	arg := ""
+	if len(parts) >= 3 {
+		arg = parts[2]
+	}
+
+	switch action {
+	case "new":
+		return handleRemoteAgyNew(botToken, chatID, arg)
+	case "attach":
+		return handleRemoteAgyAttach(botToken, chatID, arg)
+	case "menu":
+		remoteAgyConcierge.DetachSession()
+		return sendConciergeMenu(botToken, chatID)
+	case "refresh":
+		return handleRemoteAgyRefresh(botToken, chatID, arg)
+	case "pause":
+		return handleRemoteAgyPause(botToken, chatID, arg)
+	case "info":
+		return handleRemoteAgyInfo(botToken, chatID, arg)
+	case "kill":
+		return handleRemoteAgyKill(botToken, chatID, arg)
+	case "sessions":
+		return handleRemoteAgySessions(botToken, chatID)
+	case "lock":
+		serverUnlocked = false
+		return telegram.SendTelegramMessageToChat(botToken, chatID, "🔒 Server locked. Send PIN to unlock.")
+	case "answer":
+		return handleRemoteAgyAnswer(botToken, chatID, arg)
+	default:
+		return telegram.SendTelegramMessageToChat(botToken, chatID,
+			fmt.Sprintf("⚠️ Unknown remote agy action: %s", action))
+	}
+}
+
+func handleRemoteAgyNew(botToken string, chatID int64, folderName string) error {
+	var folder *remoteagy.FolderConfig
+	for i, f := range remoteAgyConcierge.Config.Folders {
+		if f.Name == folderName {
+			folder = &remoteAgyConcierge.Config.Folders[i]
+			break
+		}
+	}
+	if folder == nil {
+		return telegram.SendTelegramMessageToChat(botToken, chatID,
+			fmt.Sprintf("⚠️ Folder %q not found in config.", folderName))
+	}
+
+	sandboxStr := "🔒 Sandboxed"
+	if !folder.IsSandboxed(remoteAgyConcierge.Config.DefaultSandbox) {
+		sandboxStr = "⚠️ UNSANDBOXED"
+	}
+	_ = telegram.SendTelegramMessageToChat(botToken, chatID,
+		fmt.Sprintf("🚀 Starting agy in *%s* (%s)...\n`%s`", folder.Name, sandboxStr, folder.Path))
+
+	session, err := remoteAgyConcierge.StartRemoteSession(*folder)
+	if err != nil {
+		return telegram.SendTelegramMessageToChat(botToken, chatID,
+			fmt.Sprintf("❌ Failed to start session: %v", err))
+	}
+
+	if err := remoteAgyConcierge.AttachSession(session.Name); err != nil {
+		return telegram.SendTelegramMessageToChat(botToken, chatID,
+			fmt.Sprintf("⚠️ Session started but failed to attach: %v", err))
+	}
+
+	startOutputPoller(botToken, chatID, session.Name)
+
+	markup, _ := remoteagy.BuildAttachedKeyboard(session.Name)
+	return telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID,
+		fmt.Sprintf("✅ Connected to *%s*\n📡 Output polling active. Type to send input, `/menu` to return.", session.Name), markup)
+}
+
+func handleRemoteAgyAttach(botToken string, chatID int64, sessionName string) error {
+	if err := remoteAgyConcierge.AttachSession(sessionName); err != nil {
+		return telegram.SendTelegramMessageToChat(botToken, chatID,
+			fmt.Sprintf("❌ Failed to attach: %v", err))
+	}
+
+	if _, exists := remoteAgyPollers[sessionName]; !exists {
+		startOutputPoller(botToken, chatID, sessionName)
+	}
+
+	content, err := remoteagy.CapturePane(sessionName)
+	if err != nil {
+		content = "(could not capture pane)"
+	}
+	chunks := remoteagy.SplitMessage(content, 4096)
+	for _, chunk := range chunks {
+		_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("```\n%s\n```", chunk))
+	}
+
+	markup, _ := remoteagy.BuildAttachedKeyboard(sessionName)
+	return telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID,
+		fmt.Sprintf("📎 Attached to *%s*. Type to send input, `/menu` to return.", sessionName), markup)
+}
+
+func handleRemoteAgyRefresh(botToken string, chatID int64, sessionName string) error {
+	content, err := remoteagy.CapturePane(sessionName)
+	if err != nil {
+		return telegram.SendTelegramMessageToChat(botToken, chatID,
+			fmt.Sprintf("⚠️ Failed to capture pane: %v", err))
+	}
+
+	aq := remoteagy.DetectAskQuestion(content)
+	chunks := remoteagy.SplitMessage(content, 4096)
+	for _, chunk := range chunks {
+		_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("```\n%s\n```", chunk))
+	}
+
+	if aq != nil {
+		_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("❓ *%s*", aq.Question))
+		aqMarkup, _ := remoteagy.BuildAskQuestionKeyboard(sessionName, aq)
+		return telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "Select an option:", aqMarkup)
+	}
+
+	markup, _ := remoteagy.BuildAttachedKeyboard(sessionName)
+	return telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "🔄 Refreshed", markup)
+}
+
+func handleRemoteAgyPause(botToken string, chatID int64, sessionName string) error {
+	poller, exists := remoteAgyPollers[sessionName]
+	if !exists {
+		return telegram.SendTelegramMessageToChat(botToken, chatID, "⚠️ No poller found for this session.")
+	}
+	if poller.IsPaused() {
+		poller.Resume()
+		return telegram.SendTelegramMessageToChat(botToken, chatID, "▶️ Output polling resumed.")
+	}
+	poller.Pause()
+	return telegram.SendTelegramMessageToChat(botToken, chatID, "⏸️ Output polling paused. Tap again to resume.")
+}
+
+func handleRemoteAgyInfo(botToken string, chatID int64, sessionName string) error {
+	session, exists := remoteAgyConcierge.Sessions[sessionName]
+	if !exists {
+		return telegram.SendTelegramMessageToChat(botToken, chatID, "⚠️ Session not found.")
+	}
+	info := remoteagy.SessionInfo(session)
+	markup, _ := remoteagy.BuildAttachedKeyboard(sessionName)
+	return telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, info, markup)
+}
+
+func handleRemoteAgyKill(botToken string, chatID int64, sessionName string) error {
+	if poller, exists := remoteAgyPollers[sessionName]; exists {
+		poller.Stop()
+		delete(remoteAgyPollers, sessionName)
+	}
+	if err := remoteAgyConcierge.KillRemoteSession(sessionName); err != nil {
+		return telegram.SendTelegramMessageToChat(botToken, chatID,
+			fmt.Sprintf("⚠️ Failed to kill session: %v", err))
+	}
+	_ = telegram.SendTelegramMessageToChat(botToken, chatID,
+		fmt.Sprintf("💀 Session *%s* killed.", sessionName))
+	return sendConciergeMenu(botToken, chatID)
+}
+
+func handleRemoteAgySessions(botToken string, chatID int64) error {
+	if len(remoteAgyConcierge.Sessions) == 0 {
+		return telegram.SendTelegramMessageToChat(botToken, chatID, "📋 No active remote agy sessions.")
+	}
+	var sb strings.Builder
+	sb.WriteString("📋 *Active Remote AGY Sessions:*\n\n")
+	for name, session := range remoteAgyConcierge.Sessions {
+		status := "🟢 Running"
+		if !remoteagy.TmuxSessionExists(name) {
+			status = "🔴 Exited"
+		}
+		sb.WriteString(fmt.Sprintf("📱 `%s` %s\n   📁 %s\n", name, status, session.Folder.Path))
+	}
+	return telegram.SendTelegramMessageToChat(botToken, chatID, sb.String())
+}
+
+func handleRemoteAgyAnswer(botToken string, chatID int64, arg string) error {
+	parts := strings.SplitN(arg, ":", 2)
+	if len(parts) != 2 {
+		return telegram.SendTelegramMessageToChat(botToken, chatID, "⚠️ Invalid answer format.")
+	}
+	sessionName := parts[0]
+	optionIdx := parts[1]
+
+	if err := remoteAgyConcierge.SendInput(optionIdx); err != nil {
+		return telegram.SendTelegramMessageToChat(botToken, chatID,
+			fmt.Sprintf("⚠️ Failed to send answer: %v", err))
+	}
+	_ = telegram.SendTelegramMessageToChat(botToken, chatID,
+		fmt.Sprintf("✅ Sent option %s to *%s*", optionIdx, sessionName))
+	time.Sleep(500 * time.Millisecond)
+	return handleRemoteAgyRefresh(botToken, chatID, sessionName)
+}
+
+func startOutputPoller(botToken string, chatID int64, sessionName string) {
+	if existing, ok := remoteAgyPollers[sessionName]; ok {
+		existing.Stop()
+	}
+	poller := remoteagy.NewPoller(sessionName, 2500*time.Millisecond,
+		func(newContent string) {
+			if newContent == "" {
+				return
+			}
+			aq := remoteagy.DetectAskQuestion(newContent)
+			chunks := remoteagy.SplitMessage(newContent, 4096)
+			for _, chunk := range chunks {
+				_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("```\n%s\n```", chunk))
+			}
+			if aq != nil {
+				_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("❓ *%s*", aq.Question))
+				aqMarkup, _ := remoteagy.BuildAskQuestionKeyboard(sessionName, aq)
+				_ = telegram.SendTelegramMessageToChatWithMarkup(botToken, chatID, "Select an option:", aqMarkup)
+			}
+		},
+		func() {
+			_ = telegram.SendTelegramMessageToChat(botToken, chatID,
+				fmt.Sprintf("🔚 Session *%s* has ended.", sessionName))
+			delete(remoteAgyPollers, sessionName)
+			remoteAgyConcierge.DetachSession()
+			_ = sendConciergeMenu(botToken, chatID)
+		},
+	)
+	poller.Start()
+	remoteAgyPollers[sessionName] = poller
+}
+

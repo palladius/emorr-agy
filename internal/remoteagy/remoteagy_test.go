@@ -220,9 +220,9 @@ func TestSanitizeSessionName(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := sanitizeSessionName(tt.input)
+		result := SanitizeSessionName(tt.input)
 		if result != tt.expected {
-			t.Errorf("sanitizeSessionName(%q) = %q, want %q", tt.input, result, tt.expected)
+			t.Errorf("SanitizeSessionName(%q) = %q, want %q", tt.input, result, tt.expected)
 		}
 	}
 }

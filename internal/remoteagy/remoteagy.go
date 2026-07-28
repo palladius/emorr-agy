@@ -110,6 +110,20 @@ func NewConcierge(cfg *Config) *Concierge {
 	}
 }
 
+// GetState returns the current concierge mode and attached session name (thread-safe).
+func (c *Concierge) GetState() (ConciergeMode, string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.Mode, c.AttachedSession
+}
+
+// ActiveSessionCount returns the number of active sessions (thread-safe).
+func (c *Concierge) ActiveSessionCount() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.Sessions)
+}
+
 // --- Config Loading ---
 
 // expandHome replaces a leading ~ with the user's home directory.
@@ -178,8 +192,8 @@ func GenerateMarker(folderName string) string {
 	return fmt.Sprintf("emorr-agy-marker-%x", hash)
 }
 
-// sanitizeSessionName creates a valid tmux session name from a folder name.
-func sanitizeSessionName(folderName string) string {
+// SanitizeSessionName creates a valid tmux session name from a folder name.
+func SanitizeSessionName(folderName string) string {
 	// Remove emoji and special chars, lowercase, replace spaces with dashes
 	name := strings.ToLower(folderName)
 	var clean []rune
@@ -254,7 +268,7 @@ func (c *Concierge) StartRemoteSession(folder FolderConfig) (*RemoteSession, err
 		return nil, fmt.Errorf("maximum %d concurrent sessions reached; kill one first", MaxConcurrentSessions)
 	}
 
-	sessionName := sanitizeSessionName(folder.Name)
+	sessionName := SanitizeSessionName(folder.Name)
 
 	// Check if session already exists
 	if TmuxSessionExists(sessionName) {

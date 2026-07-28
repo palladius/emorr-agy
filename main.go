@@ -1036,7 +1036,7 @@ func sendStartupNotification() {
 
 	lockStatus := ""
 	if !serverUnlocked && !isTestMode() {
-		lockStatus = "\n🔒 *Server is locked.* Please enter the PIN (`4242`) to unlock."
+		lockStatus = "\n🔒 *Server is locked.* Please enter the PIN to unlock."
 	}
 
 	if err == nil && botToken != "" {
@@ -1163,7 +1163,13 @@ var (
 	logFatalf        = log.Fatalf
 )
 
-const HardcodedPin = "4242"
+// PinEnvVar is the environment variable name for the server PIN.
+const PinEnvVar = "EMORR_AGY_PIN"
+
+// getServerPIN reads the PIN from the environment. Returns empty string if not set.
+func getServerPIN() string {
+	return strings.TrimSpace(os.Getenv(PinEnvVar))
+}
 
 var isTestMode = func() bool {
 	return flag.Lookup("test.v") != nil || os.Getenv("TEST_ENV") == "true"
@@ -1212,6 +1218,11 @@ func runServer() error {
 		log.Printf("Warning: failed to initialize logger: %v", err)
 	}
 	defer logger.Close()
+
+	// Validate PIN is set
+	if getServerPIN() == "" && !isTestMode() {
+		return fmt.Errorf("%s is not set in environment. Server refuses to start without a PIN for security", PinEnvVar)
+	}
 
 	logger.Infof("Server started (v%s) with PID %d, listening to Telegram...", Version, currentPID)
 	sendStartupNotification()
@@ -1286,7 +1297,7 @@ func processUpdate(botToken string, update telegram.TelegramUpdate) error {
 	// PIN Gate Check
 	if !serverUnlocked && !isTestMode() {
 		pinText := strings.TrimSpace(text)
-		if pinText == HardcodedPin {
+		if pinText == getServerPIN() {
 			serverUnlocked = true
 			wrongPinAttempts = 0
 			_ = telegram.SendTelegramMessageToChat(botToken, chatID, "🔓 Server unlocked successfully! Welcome back.")

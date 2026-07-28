@@ -358,6 +358,7 @@ func TestPingate(t *testing.T) {
 	// Reset PIN gate states
 	serverUnlocked = false
 	wrongPinAttempts = 0
+	t.Setenv("EMORR_AGY_PIN", "4242")
 
 	// 1. Send wrong PIN
 	updateWrong := telegram.TelegramUpdate{
@@ -429,6 +430,7 @@ func TestPingateFatalKills(t *testing.T) {
 	// Reset PIN gate states
 	serverUnlocked = false
 	wrongPinAttempts = 0
+	t.Setenv("EMORR_AGY_PIN", "testpin")
 
 	// Mock logFatalf
 	fatalCalled := false

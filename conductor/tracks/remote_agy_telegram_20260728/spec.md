@@ -28,8 +28,8 @@ into an **active control plane** for spawning and interacting with agy sessions.
 ### FR-2: Folder Whitelist Configuration (YAML)
 
 - **FR-2.1**: A YAML configuration file defines the list of folders where agy may be launched.
-- **FR-2.2**: Default path: `~/.emorr-agy-folders.yaml`, overridable via env var `EMORR_AGY_FOLDERS_YAML`.
-  - In practice, the canonical location will be `$GIC/etc/emorr-agy-folders.yaml`, symlinked to `~/.emorr-agy-folders.yaml`.
+- **FR-2.2**: Default path: `~/.emorr-agy-folders.yaml` (or `~/.emorr-agy-server-list.yaml`), overridable via env var `EMORR_AGY_FOLDERS_YAML`.
+  - In practice, the canonical location will be `$GIC/etc/emorr-agy-server-list.yaml` for Riccardo, symlinked to the user directory.
 - **FR-2.3**: YAML schema:
 
 ```yaml

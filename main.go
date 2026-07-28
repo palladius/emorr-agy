@@ -1232,7 +1232,19 @@ func runServer() error {
 
 	sendStartupNotification()
 
+	// Drain stale updates from previous runs to avoid replaying old wrong-PIN
+	// attempts that could immediately kill the server.
 	offset := 0
+	drainUpdates, err := telegram.GetTelegramUpdates(botToken, offset)
+	if err == nil && len(drainUpdates) > 0 {
+		for _, u := range drainUpdates {
+			if u.UpdateID >= offset {
+				offset = u.UpdateID + 1
+			}
+		}
+		logger.Infof("Drained %d stale updates (new offset: %d)", len(drainUpdates), offset)
+	}
+
 	for {
 		updates, err := telegram.GetTelegramUpdates(botToken, offset)
 		if err != nil {

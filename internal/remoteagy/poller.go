@@ -9,23 +9,37 @@ import (
 
 // Poller watches the attached tmux session for new output and calls
 // the provided callback when new content is detected.
+//
+// Output strategy: Instead of sending every tiny diff immediately,
+// the poller buffers output and waits for it to stabilize (no new
+// content for debounceWait). This produces complete, readable paragraphs
+// rather than noisy character-by-character updates.
 type Poller struct {
 	mu           sync.Mutex
 	sessionName  string
-	lastContent  string
+	lastSnapshot string // the last full pane snapshot we compared against
+	pendingBuf   string // buffered new content waiting to be sent
+	lastChangeAt time.Time
 	running      bool
 	paused       bool
 	stopCh       chan struct{}
-	interval     time.Duration
-	onNewOutput  func(newContent string) // called when new output is detected
-	onSessionEnd func()                  // called when tmux session exits
+	pollInterval time.Duration
+	debounceWait time.Duration // how long to wait after last change before sending
+	onNewOutput  func(newContent string)
+	onSessionEnd func()
 }
+
+const (
+	defaultPollInterval = 2500 * time.Millisecond
+	defaultDebounceWait = 4 * time.Second // wait 4s of silence before flushing
+)
 
 // NewPoller creates a new output poller for the given session.
 func NewPoller(sessionName string, interval time.Duration, onNewOutput func(string), onSessionEnd func()) *Poller {
 	return &Poller{
 		sessionName:  sessionName,
-		interval:     interval,
+		pollInterval: interval,
+		debounceWait: defaultDebounceWait,
 		onNewOutput:  onNewOutput,
 		onSessionEnd: onSessionEnd,
 		stopCh:       make(chan struct{}),
@@ -84,13 +98,14 @@ func (p *Poller) ForceRefresh() (string, error) {
 		return "", err
 	}
 	p.mu.Lock()
-	p.lastContent = content
+	p.lastSnapshot = content
+	p.pendingBuf = "" // clear buffer on manual refresh
 	p.mu.Unlock()
 	return content, nil
 }
 
 func (p *Poller) pollLoop() {
-	ticker := time.NewTicker(p.interval)
+	ticker := time.NewTicker(p.pollInterval)
 	defer ticker.Stop()
 
 	for {
@@ -106,6 +121,8 @@ func (p *Poller) pollLoop() {
 func (p *Poller) poll() {
 	// Check if session still exists
 	if !TmuxSessionExists(p.sessionName) {
+		// Flush any remaining buffer before ending
+		p.flushPending()
 		if p.onSessionEnd != nil {
 			p.onSessionEnd()
 		}
@@ -115,23 +132,51 @@ func (p *Poller) poll() {
 
 	content, err := CapturePane(p.sessionName)
 	if err != nil {
-		return // silently skip on capture errors
+		return
 	}
 
 	p.mu.Lock()
 	paused := p.paused
-	lastContent := p.lastContent
-	p.lastContent = content
+	lastSnapshot := p.lastSnapshot
 	p.mu.Unlock()
 
 	if paused {
 		return
 	}
 
-	// Diff: only send new content
-	newContent := diffContent(lastContent, content)
-	if newContent != "" && p.onNewOutput != nil {
-		p.onNewOutput(newContent)
+	// Diff: find new content since last snapshot
+	newContent := diffContent(lastSnapshot, content)
+
+	if newContent != "" {
+		// New content detected — buffer it and update snapshot
+		p.mu.Lock()
+		p.lastSnapshot = content
+		p.pendingBuf = newContent // replace (not append) — diff is cumulative vs last sent snapshot
+		p.lastChangeAt = time.Now()
+		p.mu.Unlock()
+	}
+
+	// Check if we should flush the buffer (content has settled)
+	p.mu.Lock()
+	hasPending := p.pendingBuf != ""
+	settled := !p.lastChangeAt.IsZero() && time.Since(p.lastChangeAt) >= p.debounceWait
+	p.mu.Unlock()
+
+	if hasPending && settled {
+		p.flushPending()
+	}
+}
+
+// flushPending sends the buffered content and clears the buffer.
+func (p *Poller) flushPending() {
+	p.mu.Lock()
+	buf := p.pendingBuf
+	p.pendingBuf = ""
+	p.lastChangeAt = time.Time{} // reset
+	p.mu.Unlock()
+
+	if buf != "" && p.onNewOutput != nil {
+		p.onNewOutput(buf)
 	}
 }
 

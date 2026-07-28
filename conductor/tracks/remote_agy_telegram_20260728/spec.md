@@ -165,6 +165,26 @@ When attached to a session, a persistent row of control buttons is shown:
      my-local-session      [BUSY]  ~/git/some-project
   ```
 
+### FR-12: Repo Sandboxing (cannot escape git repo)
+
+- **FR-12.1**: The YAML config supports an optional `sandbox: true` (default: `true`) flag per folder.
+- **FR-12.2**: When `sandbox: true`, the agy launch command includes `--sandbox` flag (or equivalent) to restrict file access to the git repository root.
+- **FR-12.3**: The YAML config also supports a top-level `default_sandbox: true` setting.
+- **FR-12.4**: Example YAML:
+  ```yaml
+  default_sandbox: true   # applied to all folders unless overridden
+  folders:
+    - name: "GIC"
+      path: "~/git/gic"
+      agy_flags: ""
+      sandbox: true        # redundant but explicit — agy stays in repo
+    - name: "🔓 GIC Unsafe"
+      path: "~/git/gic"
+      agy_flags: "--dangerously-skip-permissions"
+      sandbox: false       # explicitly allows escape (USE WITH CAUTION)
+  ```
+- **FR-12.5**: At session start, emorr-agy logs the sandbox status clearly: `"Starting sandboxed agy session in ~/git/gic"` vs `"⚠️ Starting UNSANDBOXED agy session"`.
+
 ---
 
 ## Non-Functional Requirements
@@ -192,6 +212,7 @@ When attached to a session, a persistent row of control buttons is shown:
 11. ✅ Sessions survive server restart and appear as "Resume" options.
 12. ✅ emorr-agy folder is NOT in the default YAML config.
 13. ✅ `emorr-agy sessions list` shows 📱 emoji next to `remote-agy-*` sessions.
+14. ✅ YAML `sandbox` flag prevents agy from escaping the git repo when enabled.
 
 ---
 

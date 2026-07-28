@@ -154,6 +154,17 @@ When attached to a session, a persistent row of control buttons is shown:
 - **FR-10.1**: V1 supports only one emorr-agy server instance per Telegram bot/channel.
 - **FR-10.2**: (V2/TODO) Multi-server support: multiple machines sharing one Telegram bot, each identifying itself.
 
+### FR-11: Sessions List Telegram Marker
+
+- **FR-11.1**: `emorr-agy sessions list` must display a 📱 emoji next to sessions whose name matches the `remote-agy-*` pattern.
+- **FR-11.2**: This visually distinguishes Telegram-spawned sessions from locally-started ones in CLI output.
+- **FR-11.3**: Example output:
+  ```
+  📱 remote-agy-gic       [BUSY]  ~/git/gic
+  📱 remote-agy-casal     [IDLE]  ~/git/ricc-personal-life/casalborsetti-cre-app
+     my-local-session      [BUSY]  ~/git/some-project
+  ```
+
 ---
 
 ## Non-Functional Requirements
@@ -180,6 +191,7 @@ When attached to a session, a persistent row of control buttons is shown:
 10. ✅ Max 3 concurrent sessions enforced.
 11. ✅ Sessions survive server restart and appear as "Resume" options.
 12. ✅ emorr-agy folder is NOT in the default YAML config.
+13. ✅ `emorr-agy sessions list` shows 📱 emoji next to `remote-agy-*` sessions.
 
 ---
 

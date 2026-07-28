@@ -103,6 +103,10 @@
   - [ ] Test: `/menu` transitions back to CONCIERGE
   - [ ] Test: fuzzy folder matching
   - [ ] Test: max sessions enforcement in UI
+- [ ] Task: Add 📱 emoji to `sessions list` for `remote-agy-*` sessions
+  - [ ] Detect `remote-agy-` prefix in session name
+  - [ ] Prepend 📱 emoji in CLI output for matching sessions
+  - [ ] Write test: `remote-agy-gic` gets 📱, `my-local-session` does not
 - [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)
 
 ---

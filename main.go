@@ -23,7 +23,7 @@ import (
 	"github.com/palladius/emorr-agy/internal/telegram"
 )
 
-const Version = "0.2.0"
+const Version = "0.3.0"
 
 func main() {
 	// Load environment variables from .env if present

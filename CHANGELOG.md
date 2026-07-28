@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-28
+
+### Added
+- **Remote AGY Sessions via Telegram** 📱: Full remote agy session management from Telegram.
+  - `/agy` command opens the concierge menu with whitelisted folders.
+  - Launch, attach, detach, kill agy sessions in tmux from your phone.
+  - Output polling (2.5s interval) with diff detection — only new content is sent.
+  - Input relay: text/voice messages forwarded to attached agy session.
+  - `ask_question` detection: numbered options rendered as Telegram inline buttons.
+  - Message splitting with emoji pagination for long outputs (>4096 chars).
+  - Control buttons: Refresh, Pause, Info, Menu, Kill.
+  - Concierge state machine: modal routing (attached ↔ concierge menu).
+  - Session discovery on startup: existing `remote-agy-*` tmux sessions appear as "Resume".
+  - Max 3 concurrent sessions enforced.
+- **YAML Folder Whitelist** (`~/.emorr-agy-folders.yaml`):
+  - Per-folder `sandbox: true/false` flag with `default_sandbox` global default.
+  - `agy_flags` per folder for custom agy launch options.
+  - `emorr-agy` folder deliberately excluded for security (FR-09).
+- **PIN Security Hardening**:
+  - PIN now read from `EMORR_AGY_PIN` env var (no more hardcoded constant).
+  - Server refuses to start if PIN is not set.
+  - PIN no longer leaked in startup notification message.
+- **Sessions List Marker**: 📱 emoji in `sessions list` for `remote-agy-*` sessions (FR-11).
+- **Sandbox Enforcement**: `--sandbox` flag added to agy launch when `sandbox: true` (FR-12).
+- **New package**: `internal/remoteagy/` — 43+ unit tests covering config, sessions, polling, ask_question.
+
+### Changed
+- `EMORR_AGY_PIN` now required in `.env` (see `.env.dist` for documentation).
+- Added `gopkg.in/yaml.v3` dependency for YAML config parsing.
+
 ## [0.2.12] - 2026-07-24
 
 ### Fixed

@@ -85,23 +85,31 @@ func TestBuildAttachedKeyboard(t *testing.T) {
 
 // --- ask_question Detection Tests ---
 
-func TestDetectAskQuestion_NumberedOptions(t *testing.T) {
+func TestDetectAskQuestion_RealModal(t *testing.T) {
 	paneContent := `Some context here
 
-What would you like to do?
-
-1) Fix the bug
-2) Add a feature
-3) Refactor the code
+┌─ Question ────────────────────────────┐
+│ What would you like to do?            │
+│                                       │
+│ 1) Fix the bug                        │
+│ 2) Add a feature                      │
+│ 3) Refactor the code                  │
+│                                       │
+│ Submit | Skip                         │
+└───────────────────────────────────────┘
 `
 
 	result := DetectAskQuestion(paneContent)
 	if result == nil {
-		t.Fatal("expected ask_question to be detected")
+		t.Fatal("expected ask_question to be detected for real modal")
 	}
 
 	if len(result.Choices) != 3 {
 		t.Fatalf("expected 3 choices, got %d", len(result.Choices))
+	}
+
+	if result.Question != "What would you like to do?" {
+		t.Errorf("expected question text, got %q", result.Question)
 	}
 
 	if result.Choices[0].Text != "Fix the bug" {
@@ -109,19 +117,20 @@ What would you like to do?
 	}
 }
 
-func TestDetectAskQuestion_DotNotation(t *testing.T) {
-	paneContent := `
-1. Yes, proceed
-2. No, stop
+func TestDetectAskQuestion_BareNumberedList_NoFalsePositive(t *testing.T) {
+	// A regular numbered list should NOT be detected as ask_question
+	paneContent := `Here are the 5 most recent scripts:
+
+1) bin/generate_video.sh
+2) bin/deploy.sh
+3) bin/test_runner.sh
+4) bin/backup.sh
+5) bin/cleanup.sh
 `
 
 	result := DetectAskQuestion(paneContent)
-	if result == nil {
-		t.Fatal("expected ask_question to be detected")
-	}
-
-	if len(result.Choices) != 2 {
-		t.Fatalf("expected 2 choices, got %d", len(result.Choices))
+	if result != nil {
+		t.Errorf("bare numbered list should NOT trigger ask_question, got %+v", result)
 	}
 }
 
@@ -134,12 +143,17 @@ func TestDetectAskQuestion_NoOptions(t *testing.T) {
 	}
 }
 
-func TestDetectAskQuestion_SingleOption(t *testing.T) {
-	paneContent := "1) Only one option"
-
+func TestDetectAskQuestion_ModalWithoutSubmit(t *testing.T) {
+	// A box without Submit/Skip is NOT a real ask_question
+	paneContent := `
+┌─ Info ────────────────────────────────┐
+│ 1) Item A                             │
+│ 2) Item B                             │
+└───────────────────────────────────────┘
+`
 	result := DetectAskQuestion(paneContent)
 	if result != nil {
-		t.Error("expected nil for single option (need at least 2)")
+		t.Errorf("box without Submit/Skip should not trigger, got %+v", result)
 	}
 }
 

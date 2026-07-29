@@ -113,69 +113,97 @@ type DetectedAskQuestion struct {
 }
 
 // DetectAskQuestion attempts to find an ask_question modal in the tmux pane output.
-// It looks for patterns like numbered options with a question prompt.
-// Returns nil if no ask_question is detected.
+// It ONLY triggers on the actual Antigravity ask_question rendered modal, which
+// uses box-drawing characters (┌ ─ ┐ │ └ ┘) and has Submit/Skip buttons.
+// Regular numbered lists in agy output are NOT detected as questions.
+// Returns nil if no ask_question modal is detected.
 func DetectAskQuestion(paneContent string) *DetectedAskQuestion {
 	lines := strings.Split(paneContent, "\n")
 
-	// Look for patterns that indicate a question with numbered options:
-	// 1) text
-	// 2) text
-	// or
-	// 1. text
-	// 2. text
+	// Phase 1: Find the box-drawn modal region.
+	// Real ask_question modals look like:
+	//   ┌─ Question ────────────────┐
+	//   │ Which option?             │
+	//   │                           │
+	//   │ 1) Option A               │
+	//   │ 2) Option B               │
+	//   │                           │
+	//   │ Submit | Skip             │
+	//   └───────────────────────────┘
+	//
+	// Key signals: line starting with "│" containing numbered options,
+	// and presence of "Submit" or "Skip" on a "│" line.
+
+	inBox := false
+	hasSubmitSkip := false
 	var questionLine string
 	var choices []AskQuestionChoice
-	inOptions := false
 
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
-		if line == "" {
-			if inOptions && len(choices) >= 2 {
-				// Found enough options, the line before options is the question
-				if i > 0 {
-					questionLine = strings.TrimSpace(lines[i])
-				}
-				break
-			}
+	for _, rawLine := range lines {
+		line := strings.TrimSpace(rawLine)
+
+		// Detect box top
+		if strings.HasPrefix(line, "┌") {
+			inBox = true
+			choices = nil
+			questionLine = ""
+			hasSubmitSkip = false
 			continue
 		}
 
-		// Check for numbered option patterns
-		if isNumberedOption(line) {
-			idx, text := parseNumberedOption(line)
+		// Detect box bottom
+		if strings.HasPrefix(line, "└") {
+			if inBox && hasSubmitSkip && len(choices) >= 2 {
+				// Valid modal found!
+				if questionLine == "" {
+					questionLine = "Select an option:"
+				}
+				return &DetectedAskQuestion{
+					Question: questionLine,
+					Choices:  choices,
+				}
+			}
+			inBox = false
+			continue
+		}
+
+		if !inBox {
+			continue
+		}
+
+		// Inside the box — strip the │ borders
+		if !strings.HasPrefix(line, "│") {
+			continue
+		}
+		inner := strings.TrimSpace(strings.TrimPrefix(strings.TrimSuffix(strings.TrimSpace(line), "│"), "│"))
+
+		if inner == "" {
+			continue
+		}
+
+		// Check for Submit/Skip line
+		lowerInner := strings.ToLower(inner)
+		if strings.Contains(lowerInner, "submit") || strings.Contains(lowerInner, "skip") {
+			hasSubmitSkip = true
+			continue
+		}
+
+		// Check for numbered option
+		if isNumberedOption(inner) {
+			idx, text := parseNumberedOption(inner)
 			if idx > 0 {
-				choices = append([]AskQuestionChoice{{Index: idx, Text: text}}, choices...)
-				inOptions = true
+				choices = append(choices, AskQuestionChoice{Index: idx, Text: text})
 				continue
 			}
 		}
 
-		// If we were in options and hit a non-option line, that's the question
-		if inOptions && len(choices) >= 2 {
-			questionLine = line
-			break
-		}
-
-		// Reset if not in a valid pattern
-		if !inOptions {
-			continue
+		// Non-option, non-submit line inside box — likely the question text
+		if len(choices) == 0 && questionLine == "" {
+			questionLine = inner
 		}
 	}
 
-	if len(choices) < 2 {
-		return nil
-	}
-
-	// If we didn't find a question line, use a generic one
-	if questionLine == "" {
-		questionLine = "Select an option:"
-	}
-
-	return &DetectedAskQuestion{
-		Question: questionLine,
-		Choices:  choices,
-	}
+	return nil
 }
 
 // BuildAskQuestionKeyboard creates inline buttons for detected ask_question choices.

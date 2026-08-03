@@ -2202,7 +2202,11 @@ func handleRemoteAgyRefresh(botToken string, chatID int64, sessionName string) e
 	}
 
 	aq := remoteagy.DetectAskQuestion(content)
-	chunks := remoteagy.SplitMessage(content, 4096)
+	cleaned := remoteagy.SanitizePaneOutput(content)
+	if cleaned == "" {
+		cleaned = "(no meaningful output)"
+	}
+	chunks := remoteagy.SplitMessage(cleaned, 4096)
 	for _, chunk := range chunks {
 		_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("```\n%s\n```", chunk))
 	}
@@ -2298,7 +2302,12 @@ func startOutputPoller(botToken string, chatID int64, sessionName string) {
 				return
 			}
 			aq := remoteagy.DetectAskQuestion(newContent)
-			chunks := remoteagy.SplitMessage(newContent, 4096)
+			// Sanitize: strip agy UI chrome before sending to Telegram
+			cleaned := remoteagy.SanitizePaneOutput(newContent)
+			if cleaned == "" {
+				return // nothing meaningful to send
+			}
+			chunks := remoteagy.SplitMessage(cleaned, 4096)
 			for _, chunk := range chunks {
 				_ = telegram.SendTelegramMessageToChat(botToken, chatID, fmt.Sprintf("```\n%s\n```", chunk))
 			}

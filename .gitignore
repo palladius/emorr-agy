@@ -24,3 +24,6 @@ nano_banana/
 # Local logs
 log/
 sessions-list.txt
+
+# Worktrees
+.worktrees/

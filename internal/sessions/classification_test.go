@@ -28,7 +28,7 @@ func TestClassificationEmoji(t *testing.T) {
 		want  string
 	}{
 		{"finished emoji", ClassFinished, "🟢"},
-		{"needs_resume emoji", ClassNeedsResume, "🟡"},
+		{"needs_resume emoji", ClassNeedsResume, "⏸️"},
 
 		{"obsolete emoji", ClassObsolete, "🪦"},
 		{"unknown emoji", SessionClassification("unknown"), "❓"},
@@ -71,7 +71,7 @@ func TestClassificationString(t *testing.T) {
 		want  string
 	}{
 		{"finished string", ClassFinished, "🟢 FINISHED"},
-		{"needs_resume string", ClassNeedsResume, "🟡 NEEDS_RESUME"},
+		{"needs_resume string", ClassNeedsResume, "⏸️ NEEDS_RESUME"},
 		{"obsolete string", ClassObsolete, "🪦 OBSOLETE"},
 
 	}

@@ -163,24 +163,38 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				folder = folder[:27] + "..."
 			}
 
+			rowColor := sessionRowColor(s)
+
 			ageColor := color.LightGray
-			if !s.LastActivity.IsZero() && time.Since(s.LastActivity) < time.Hour {
+			if rowColor != "" {
+				ageColor = rowColor
+			} else if !s.LastActivity.IsZero() && time.Since(s.LastActivity) < time.Hour {
 				ageColor = color.Green
 			} else if strings.Contains(age, "d") || age == "n/a" {
 				ageColor = color.DarkGray
 			}
 
-			coloredDesc := FormatTitleAndDescription(s.Title, s.Description, s.WorktreeBranch, s.IsCron)
+			dirColor := folderColor(s.Folder)
+			if rowColor != "" {
+				dirColor = rowColor
+			}
+
+			otherColor := color.Plain
+			if rowColor != "" {
+				otherColor = rowColor
+			}
+
+			coloredDesc := FormatTitleAndDescriptionWithColor(s.Title, s.Description, s.WorktreeBranch, s.IsCron, rowColor)
 			statusAndHarness := fmt.Sprintf("%s%s   ", emoji, harnessEmoji)
 
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				color.Colorize(statusAndHarness, color.Plain),
-				color.Colorize(ShortenSessionID(s.ID), color.BoldWhite),
+				color.Colorize(ShortenSessionID(s.ID), sessionIDColor(s)),
 				color.Colorize(fmt.Sprintf("%3s", age), ageColor),
-				color.Colorize(folder, folderColor(s.Folder)),
-				color.Colorize(s.Harness, color.Plain),
-				color.Colorize(strconv.Itoa(s.ProcessCount), color.Plain),
-				color.Colorize(s.ResumeCommand, color.Plain),
+				color.Colorize(folder, dirColor),
+				color.Colorize(s.Harness, otherColor),
+				color.Colorize(strconv.Itoa(s.ProcessCount), otherColor),
+				color.Colorize(s.ResumeCommand, otherColor),
 				coloredDesc,
 			)
 		}
@@ -212,21 +226,30 @@ func ListSessions(w io.Writer, engine *ClassificationEngine, opts ListOptions) e
 				folder = folder[:27] + "..."
 			}
 
+			rowColor := sessionRowColor(s)
+
 			ageColor := color.LightGray
-			if !s.LastActivity.IsZero() && time.Since(s.LastActivity) < time.Hour {
+			if rowColor != "" {
+				ageColor = rowColor
+			} else if !s.LastActivity.IsZero() && time.Since(s.LastActivity) < time.Hour {
 				ageColor = color.Green
 			} else if strings.Contains(age, "d") || age == "n/a" {
 				ageColor = color.DarkGray
 			}
 
-			coloredDesc := FormatTitleAndDescription(s.Title, s.Description, s.WorktreeBranch, s.IsCron)
+			dirColor := folderColor(s.Folder)
+			if rowColor != "" {
+				dirColor = rowColor
+			}
+
+			coloredDesc := FormatTitleAndDescriptionWithColor(s.Title, s.Description, s.WorktreeBranch, s.IsCron, rowColor)
 
 			fmt.Fprintf(tw, "%s%s   \t%s\t%s\t%s\t%s\n",
 				emoji, harnessEmoji,
 
-				color.Colorize(ShortenSessionID(s.ID), color.BoldWhite),
+				color.Colorize(ShortenSessionID(s.ID), sessionIDColor(s)),
 				color.Colorize(fmt.Sprintf("%3s", age), ageColor),
-				color.Colorize(folder, folderColor(s.Folder)),
+				color.Colorize(folder, dirColor),
 				coloredDesc,
 			)
 		}
@@ -381,10 +404,9 @@ func CleanSynopsis(s string) string {
 	return strings.TrimSpace(s)
 }
 
-// FormatTitleAndDescription builds colored description:
-// title (with [ and ] brackets removed) in Yellow prefixed with 🏷️ (no space after emoji),
-// followed by description in Cyan separated by a single space (no │ character).
-func FormatTitleAndDescription(rawTitle, desc, worktreeBranch string, isCron bool) string {
+// FormatTitleAndDescriptionWithColor builds colored description. If overrideColor is provided,
+// the entire string is colored with overrideColor instead of default Yellow/Cyan/Green highlights.
+func FormatTitleAndDescriptionWithColor(rawTitle, desc, worktreeBranch string, isCron bool, overrideColor string) string {
 	desc = CleanSynopsis(desc)
 	if isCron {
 		desc = "🔁 " + desc
@@ -397,6 +419,22 @@ func FormatTitleAndDescription(rawTitle, desc, worktreeBranch string, isCron boo
 	cleanTitle = strings.ReplaceAll(cleanTitle, "]", "")
 	cleanTitle = strings.TrimSpace(cleanTitle)
 
+	if overrideColor != "" {
+		var text string
+		if cleanTitle != "" {
+			text = cleanTitle + "🏷️"
+			if desc != "" {
+				text += " " + desc
+			}
+		} else {
+			text = desc
+		}
+		if worktreeBranch != "" {
+			text = "🌳 " + worktreeBranch + " " + text
+		}
+		return color.Colorize(text, overrideColor)
+	}
+
 	var coloredDesc string
 	if cleanTitle != "" {
 		coloredDesc = color.Colorize(cleanTitle, color.Yellow) + "🏷️"
@@ -407,12 +445,18 @@ func FormatTitleAndDescription(rawTitle, desc, worktreeBranch string, isCron boo
 		coloredDesc = color.Colorize(desc, color.Cyan)
 	}
 
-
 	if worktreeBranch != "" {
 		coloredDesc = "🌳 " + color.Colorize(worktreeBranch, color.Green) + " " + coloredDesc
 	}
 
 	return coloredDesc
+}
+
+// FormatTitleAndDescription builds colored description:
+// title (with [ and ] brackets removed) in Yellow prefixed with 🏷️ (no space after emoji),
+// followed by description in Cyan separated by a single space (no │ character).
+func FormatTitleAndDescription(rawTitle, desc, worktreeBranch string, isCron bool) string {
+	return FormatTitleAndDescriptionWithColor(rawTitle, desc, worktreeBranch, isCron, "")
 }
 
 // FindGitRoot returns (repoRoot, worktreeBranch, relSubfolder) for a given directory path.
@@ -484,8 +528,9 @@ func FindGitRoot(dir string) (repoRoot string, worktreeBranch string, relSubfold
 	return firstGit, "", firstRel
 }
 
-// FormatSubfolder cleans and formats a subfolder path, capping it to max 20 chars followed by .../
-func FormatSubfolder(subfolder string) string {
+// FormatSubfolderWithColor cleans and formats a subfolder path, capping it to max 20 chars followed by .../
+// If overrideColor is non-empty, uses it instead of default Blue.
+func FormatSubfolderWithColor(subfolder string, overrideColor string) string {
 	if subfolder == "" {
 		return ""
 	}
@@ -493,7 +538,16 @@ func FormatSubfolder(subfolder string) string {
 	if len(clean) > 20 {
 		clean = clean[:17] + ".../"
 	}
-	return "📁 " + color.Colorize(clean, color.Blue)
+	folderClr := color.Blue
+	if overrideColor != "" {
+		folderClr = overrideColor
+	}
+	return "📁 " + color.Colorize(clean, folderClr)
+}
+
+// FormatSubfolder cleans and formats a subfolder path, capping it to max 20 chars followed by .../
+func FormatSubfolder(subfolder string) string {
+	return FormatSubfolderWithColor(subfolder, "")
 }
 
 type FolderGroup struct {
@@ -576,19 +630,28 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 				harnessEmoji := getEmojiForHarness(s.Harness)
 				age := FormatAge(s.LastActivity)
 
+				rowColor := sessionRowColor(s)
+
 				ageColor := color.LightGray
-				if !s.LastActivity.IsZero() && time.Since(s.LastActivity) < time.Hour {
+				if rowColor != "" {
+					ageColor = rowColor
+				} else if !s.LastActivity.IsZero() && time.Since(s.LastActivity) < time.Hour {
 					ageColor = color.Green
 				} else if strings.Contains(age, "d") || age == "n/a" {
 					ageColor = color.DarkGray
 				}
 
-				subfolderStr := FormatSubfolder(s.Subfolder)
+				subfolderStr := FormatSubfolderWithColor(s.Subfolder, rowColor)
 
 				shortID := ShortenSessionID(s.ID)
 				coloredID := color.Colorize(shortID, sessionIDColor(s))
 				coloredAge := color.Colorize(fmt.Sprintf("%3s", age), ageColor)
-				coloredDesc := FormatTitleAndDescription(s.Title, s.Description, "", s.IsCron)
+				coloredDesc := FormatTitleAndDescriptionWithColor(s.Title, s.Description, "", s.IsCron, rowColor)
+
+				otherColor := color.Plain
+				if rowColor != "" {
+					otherColor = rowColor
+				}
 
 				statusAndHarness := fmt.Sprintf("    %s%s   ", emoji, harnessEmoji)
 
@@ -597,9 +660,9 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 					coloredID,
 					coloredAge,
 					subfolderStr,
-					color.Colorize(s.Harness, color.Plain),
-					color.Colorize(strconv.Itoa(s.ProcessCount), color.Plain),
-					color.Colorize(s.ResumeCommand, color.Plain),
+					color.Colorize(s.Harness, otherColor),
+					color.Colorize(strconv.Itoa(s.ProcessCount), otherColor),
+					color.Colorize(s.ResumeCommand, otherColor),
 					coloredDesc,
 				)
 			}
@@ -609,19 +672,23 @@ func renderGroupedSessions(w io.Writer, sessions []Session, homeDir string, form
 				harnessEmoji := getEmojiForHarness(s.Harness)
 				age := FormatAge(s.LastActivity)
 
+				rowColor := sessionRowColor(s)
+
 				ageColor := color.LightGray
-				if !s.LastActivity.IsZero() && time.Since(s.LastActivity) < time.Hour {
+				if rowColor != "" {
+					ageColor = rowColor
+				} else if !s.LastActivity.IsZero() && time.Since(s.LastActivity) < time.Hour {
 					ageColor = color.Green
 				} else if strings.Contains(age, "d") || age == "n/a" {
 					ageColor = color.DarkGray
 				}
 
-				subfolderStr := FormatSubfolder(s.Subfolder)
+				subfolderStr := FormatSubfolderWithColor(s.Subfolder, rowColor)
 
 				shortID := ShortenSessionID(s.ID)
 				coloredID := color.Colorize(shortID, sessionIDColor(s))
 				coloredAge := color.Colorize(fmt.Sprintf("%3s", age), ageColor)
-				coloredDesc := FormatTitleAndDescription(s.Title, s.Description, "", s.IsCron)
+				coloredDesc := FormatTitleAndDescriptionWithColor(s.Title, s.Description, "", s.IsCron, rowColor)
 
 				statusAndHarness := fmt.Sprintf("    %s%s   ", emoji, harnessEmoji)
 

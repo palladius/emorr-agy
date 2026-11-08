@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/palladius/emorr-agy/internal/color"
 )
 
 
@@ -646,6 +648,81 @@ func TestShortenSessionIDAndTitleFormat(t *testing.T) {
 		}
 	})
 }
+
+func TestSessionColorHelpers(t *testing.T) {
+	t.Run("sessionIDColor", func(t *testing.T) {
+		liveTmux := Session{State: StateOpenTmux}
+		if got := sessionIDColor(liveTmux); got != color.Yellow {
+			t.Errorf("sessionIDColor(liveTmux) = %q, want %q", got, color.Yellow)
+		}
+
+		liveAgy := Session{State: StateOpenAgy}
+		if got := sessionIDColor(liveAgy); got != color.Yellow {
+			t.Errorf("sessionIDColor(liveAgy) = %q, want %q", got, color.Yellow)
+		}
+
+		livePrivate := Session{State: StateOpenPrivate}
+		if got := sessionIDColor(livePrivate); got != color.Yellow {
+			t.Errorf("sessionIDColor(livePrivate) = %q, want %q", got, color.Yellow)
+		}
+
+		needsResume := Session{Classification: ClassNeedsResume}
+		if got := sessionIDColor(needsResume); got != color.BoldWhite {
+			t.Errorf("sessionIDColor(needsResume) = %q, want %q", got, color.BoldWhite)
+		}
+
+		obsolete := Session{Classification: ClassObsolete}
+		if got := sessionIDColor(obsolete); got != color.DarkGray {
+			t.Errorf("sessionIDColor(obsolete) = %q, want %q", got, color.DarkGray)
+		}
+
+		finished := Session{Classification: ClassFinished}
+		if got := sessionIDColor(finished); got != color.DarkGray {
+			t.Errorf("sessionIDColor(finished) = %q, want %q", got, color.DarkGray)
+		}
+
+		archived := Session{State: StateDeadArchived}
+		if got := sessionIDColor(archived); got != color.DarkGray {
+			t.Errorf("sessionIDColor(archived) = %q, want %q", got, color.DarkGray)
+		}
+	})
+
+	t.Run("sessionRowColor", func(t *testing.T) {
+		finished := Session{Classification: ClassFinished}
+		if got := sessionRowColor(finished); got != color.DarkGray {
+			t.Errorf("sessionRowColor(finished) = %q, want %q", got, color.DarkGray)
+		}
+
+		obsolete := Session{Classification: ClassObsolete}
+		if got := sessionRowColor(obsolete); got != color.DarkGray {
+			t.Errorf("sessionRowColor(obsolete) = %q, want %q", got, color.DarkGray)
+		}
+
+		archived := Session{State: StateDeadArchived}
+		if got := sessionRowColor(archived); got != color.DarkGray {
+			t.Errorf("sessionRowColor(archived) = %q, want %q", got, color.DarkGray)
+		}
+
+		needsResume := Session{Classification: ClassNeedsResume}
+		if got := sessionRowColor(needsResume); got != "" {
+			t.Errorf("sessionRowColor(needsResume) = %q, want empty", got)
+		}
+
+		live := Session{State: StateOpenTmux}
+		if got := sessionRowColor(live); got != "" {
+			t.Errorf("sessionRowColor(live) = %q, want empty", got)
+		}
+	})
+
+	t.Run("FormatTitleAndDescriptionWithColor override", func(t *testing.T) {
+		got := FormatTitleAndDescriptionWithColor("MyTitle", "MyDesc", "mybranch", false, color.DarkGray)
+		expected := color.Colorize("🌳 mybranch MyTitle🏷️ MyDesc", color.DarkGray)
+		if got != expected {
+			t.Errorf("got %q, want %q", got, expected)
+		}
+	})
+}
+
 
 
 

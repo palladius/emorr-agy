@@ -23,7 +23,7 @@ import (
 	"github.com/palladius/emorr-agy/internal/telegram"
 )
 
-const Version = "0.3.0"
+const Version = "0.3.1"
 
 func main() {
 	// Load environment variables from .env if present
@@ -259,9 +259,43 @@ func main() {
 				log.Fatalf("Error showing session %q: %v", sessionID, err)
 			}
 
+		case "timeline":
+			if len(os.Args) < 4 {
+				fmt.Println("Error: missing session ID")
+				fmt.Println("Usage: emorr-agy sessions timeline <session_id>")
+				os.Exit(1)
+			}
+			sessionID := os.Args[3]
+			tPath, uuid, err := sessions.FindTranscriptPath(homeDir, sessionID)
+			if err != nil {
+				log.Fatalf("Error locating transcript: %v", err)
+			}
+			if err := sessions.ShowTimeline(os.Stdout, tPath, uuid, homeDir); err != nil {
+				log.Fatalf("Error showing timeline: %v", err)
+			}
+
 		default:
 			printUsage()
 			os.Exit(1)
+		}
+
+	case "timeline":
+		if len(os.Args) < 3 {
+			fmt.Println("Error: missing session ID")
+			fmt.Println("Usage: emorr-agy timeline <session_id>")
+			os.Exit(1)
+		}
+		sessionID := os.Args[2]
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting user home dir: %v", err)
+		}
+		tPath, uuid, err := sessions.FindTranscriptPath(homeDir, sessionID)
+		if err != nil {
+			log.Fatalf("Error locating transcript: %v", err)
+		}
+		if err := sessions.ShowTimeline(os.Stdout, tPath, uuid, homeDir); err != nil {
+			log.Fatalf("Error showing timeline: %v", err)
 		}
 
 	case "resume":
@@ -306,6 +340,8 @@ func printUsage() {
 	fmt.Println("  emorr-agy check                     - Verify tmux installation and mouse settings")
 	fmt.Println("  emorr-agy sessions list [options]   - List active and history sessions")
 	fmt.Println("  emorr-agy sessions show <id> [opts] - Show session details and LLM status")
+	fmt.Println("  emorr-agy sessions timeline <id>    - Render chronological transcript timeline with stats")
+	fmt.Println("  emorr-agy timeline <id>             - Shortcut for sessions timeline")
 	fmt.Println("  emorr-agy resume <id>               - Resume/resuscitate a dead or active session")
 	fmt.Println("  emorr-agy ps                        - Show active harness processes, CWD, and dynamic status")
 	fmt.Println("\nSessions List Flags:")

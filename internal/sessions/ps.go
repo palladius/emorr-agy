@@ -27,11 +27,12 @@ type ProcessStatus struct {
 }
 
 type TranscriptStep struct {
-	StepIndex int             `json:"step_index"`
-	Source    string          `json:"source"`
-	Type      string          `json:"type"`
-	Status    string          `json:"status"`
-	Content   string          `json:"content"`
+	StepIndex int              `json:"step_index"`
+	Source    string           `json:"source"`
+	Type      string           `json:"type"`
+	Status    string           `json:"status"`
+	Content   string           `json:"content"`
+	CreatedAt string           `json:"created_at"`
 	ToolCalls []TranscriptTool `json:"tool_calls"`
 }
 

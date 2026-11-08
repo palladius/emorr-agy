@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-11-08
+
+### Added
+- **Transcript Timeline Viewer** 📋 (Phase 2, closes #7):
+  - `emorr-agy timeline <id>` and `emorr-agy sessions timeline <id>` subcommands.
+  - Chronological rendering of session transcripts with date change separators (`📅 YYYY-MM-DD`).
+  - Distinguishes user prompts (`👤`), planner responses (`🚀`), tool calls (`🐚 run_command`, `👀 view_file`, generic `🛠️`).
+  - Session statistics banner: duration, step count, start/end timestamps.
+  - Smart resume and tmux command recommendations derived from transcript repo discovery.
+
 ## [0.3.0] - 2026-07-28
 
 ### Added

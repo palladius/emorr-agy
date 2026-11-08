@@ -41,24 +41,24 @@
 
 ## Phase 2: Transcript Timeline Viewer (P1 — GitHub Issue #7)
 
-- [ ] Task: Add timeline subcommand CLI wiring
-    - [ ] Write test for CLI argument parsing of `timeline <id>` subcommand
-    - [ ] Add `timeline` case to main.go switch, wire to `sessions.ShowTimeline()`
+- [x] Task: Add timeline subcommand CLI wiring
+    - [x] Write test for CLI argument parsing of `timeline <id>` subcommand
+    - [x] Add `timeline` case to main.go switch, wire to `sessions.ShowTimeline()`
 
-- [ ] Task: Implement transcript timeline renderer
-    - [ ] Write tests for `ShowTimeline()` covering: USER_INPUT rendering with XML cleanup, PLANNER_RESPONSE text rendering, run_command tool calls showing CommandLine, view_file tool calls showing AbsolutePath, other tool calls showing name+args, date separator on day change
-    - [ ] Create `internal/sessions/timeline.go` with `ShowTimeline(w io.Writer, transcriptPath string) error`
-    - [ ] Parse transcript.jsonl line by line, render formatted output with emojis and ANSI colors
+- [x] Task: Implement transcript timeline renderer
+    - [x] Write tests for `ShowTimeline()` covering: USER_INPUT rendering with XML cleanup, PLANNER_RESPONSE text rendering, run_command tool calls showing CommandLine, view_file tool calls showing AbsolutePath, other tool calls showing name+args, date separator on day change
+    - [x] Create `internal/sessions/timeline.go` with `ShowTimeline(w io.Writer, transcriptPath string) error`
+    - [x] Parse transcript.jsonl line by line, render formatted output with emojis and ANSI colors
 
-- [ ] Task: Add session stats at bottom of timeline
-    - [ ] Write tests for stats display (duration, step count, start/end times)
-    - [ ] Add stats section after timeline rendering in ShowTimeline()
+- [x] Task: Add session stats at bottom of timeline
+    - [x] Write tests for stats display (duration, step count, start/end times)
+    - [x] Add stats section after timeline rendering in ShowTimeline()
 
-- [ ] Task: Add resume command hints at bottom
-    - [ ] Write tests for resume command hint formatting
-    - [ ] Show `cd ~/git/<repo> && agy --conversation <uuid>` and tmux variant
+- [x] Task: Add resume command hints at bottom
+    - [x] Write tests for resume command hint formatting
+    - [x] Show `cd ~/git/<repo> && agy --conversation <uuid>` and tmux variant
 
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Timeline Viewer' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Timeline Viewer' (Protocol in workflow.md)
 
 ## Phase 3: Auto-Resume and CLI Archive (P2 — GitHub Issue #8)
 
